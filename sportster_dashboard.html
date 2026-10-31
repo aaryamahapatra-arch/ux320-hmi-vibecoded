@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Round Dash Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --page:#121316; --panel:#1a1c20; --panel-line:#2b2f35; --panel-ink:#e9e6e0; --panel-dim:#8c929a;
+  --accent:#ff6b1a;
+  --num:'Barlow Condensed','Arial Narrow',Impact,sans-serif;
+  --txt:'Barlow','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--panel-ink);font-family:var(--txt)}
+body{min-height:100vh;padding:20px 16px 40px}
+h1{font:600 22px/1.2 var(--num);letter-spacing:.02em;margin:0 0 2px}
+.sub{color:var(--panel-dim);font-size:13px;margin:0 0 18px;max-width:70ch}
+.shell{display:grid;grid-template-columns:minmax(0,520px) minmax(300px,1fr);gap:24px;align-items:start;max-width:1180px;margin:0 auto}
+@media (max-width:900px){.shell{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:18px;align-items:center}
+
+/* ---------- DISPLAY ---------- */
+.bezel{padding:14px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#3a3d43,#0d0e10 70%);box-shadow:0 18px 40px rgba(0,0,0,.55), inset 0 0 0 2px #050506}
+.display{
+  --bg:#0b0c0e; --ink:#f3efe8; --dim:#8a9097; --line:#252a30; --soft:#15181c; --accent:#ff6b1a;
+  --ok:#37c9a0; --warn:#ffb21f; --bad:#ff4438; --scrim:rgba(7,8,10,.80);
+  position:relative;width:min(480px,86vw);aspect-ratio:1;border-radius:50%;overflow:hidden;
+  background:var(--bg);color:var(--ink);container-type:size;font-family:var(--txt);user-select:none
+}
+.display[data-theme="light"]{
+  --bg:#e9e6df; --ink:#15171a; --dim:#5b616a; --line:#c9c5ba; --soft:#dcd8ce; --accent:#d94f00;
+  --ok:#0e8a68; --warn:#b97600; --bad:#c9281c; --scrim:rgba(233,230,223,.84)
+}
+.layer{position:absolute;inset:0}
+.layer>*{position:absolute}
+#L1{z-index:1}#L2{z-index:2}#L3{z-index:3}#L4{z-index:4}#L5{z-index:5}#L6{z-index:6;pointer-events:none}
+.lab{font-size:3.1cqw;color:var(--dim);font-weight:500}
+.num{font-family:var(--num);font-weight:600;font-variant-numeric:tabular-nums}
+svg.ring{inset:0;width:100%;height:100%}
+
+/* global zone */
+.tells{left:50%;top:7.5%;transform:translateX(-50%);display:flex;gap:3cqw}
+.tell{width:5.2cqw;height:5.2cqw;stroke:var(--line);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tell.on-warn{stroke:var(--warn)}.tell.on-bad{stroke:var(--bad)}.tell.on-ok{stroke:var(--ok)}
+.clock{left:50%;top:14%;transform:translateX(-50%);font:600 5.6cqw var(--num);letter-spacing:.04em}
+
+/* pages */
+.page{inset:0}
+.page>*{position:absolute}
+.home .speed{left:50%;top:25%;transform:translateX(-50%);text-align:center;line-height:.9}
+.home .speed b{display:block;font:700 33cqw/0.82 var(--num);letter-spacing:-.01em}
+.home .speed span{font-size:4cqw;color:var(--dim)}
+.home .gear{left:17%;top:41%;text-align:center}
+.home .gear b{display:block;font:700 13cqw/1 var(--num);color:var(--accent)}
+.home .fuel{right:14%;top:42%;text-align:center;width:16cqw}
+.home .fuel .lab{display:block}
+.home .fuel .bar{height:2.2cqw;border-radius:2cqw;background:var(--line);margin-top:1.6cqw;overflow:hidden}
+.home .fuel .bar i{display:block;height:100%;background:var(--ink)}
+.home .fuel.low .bar i{background:var(--bad)}
+.home .fuel b{font:600 6cqw var(--num)}
+.tripwin{left:50%;top:63.5%;transform:translateX(-50%);text-align:center;min-width:46cqw;padding:1.6cqw 4cqw 2cqw;border-radius:6cqw;background:var(--soft);border:1px solid var(--line)}
+.tripwin b{display:block;font:600 7.4cqw/1.05 var(--num)}
+.dots{display:flex;gap:1.4cqw;justify-content:center;margin-top:.8cqw}
+.dots i{width:1.4cqw;height:1.4cqw;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--accent)}
+
+.map{inset:0;width:100%;height:100%}
+.chip{font-size:3.2cqw;padding:.9cqw 2.6cqw;border-radius:4cqw;background:var(--scrim);border:1px solid var(--line)}
+.chip.l{left:18%;top:23%}.chip.r{right:18%;top:23%}
+.chip.accent{border-color:var(--accent);color:var(--accent)}
+.tripinfo{left:50%;top:58%;transform:translateX(-50%);width:72cqw;white-space:nowrap;display:grid;grid-template-columns:repeat(3,1fr);text-align:center;padding:2cqw 1cqw;border-radius:4cqw;background:var(--scrim);border:1px solid var(--accent)}
+.tripinfo b{display:block;font:600 5.6cqw/1.1 var(--num)}
+
+.music .disc{left:50%;top:25%;transform:translateX(-50%);width:27cqw;height:27cqw;border-radius:50%;
+  background:conic-gradient(from 20deg,var(--accent),#2a2d33 25%,var(--soft) 40%,#2a2d33 60%,var(--accent) 100%);border:1px solid var(--line)}
+.music .disc::after{content:"";position:absolute;inset:38%;border-radius:50%;background:var(--bg);border:1px solid var(--line)}
+.music .ti{left:0;right:0;top:54%;text-align:center}
+.music .ti b{display:block;font:600 7.4cqw/1.1 var(--num)}
+.music .prog{left:26%;right:26%;top:69%;height:1.4cqw;border-radius:1cqw;background:var(--line);overflow:hidden}
+.music .prog i{display:block;height:100%;background:var(--accent)}
+.music .state{left:0;right:0;top:72%;text-align:center;font-size:3.4cqw;color:var(--dim)}
+.nophone{left:50%;top:44%;transform:translateX(-50%);text-align:center;color:var(--warn);font-size:3.6cqw;width:56cqw;background:var(--scrim);padding:2cqw;border-radius:3cqw;border:1px solid var(--warn)}
+
+.list{left:50%;top:23%;transform:translateX(-50%);width:68cqw}
+.list h2{margin:0 0 1.2cqw;font:600 5cqw var(--num);letter-spacing:.03em}
+.row{display:flex;justify-content:space-between;align-items:center;height:10.2cqw;padding:0 3.5cqw;border-radius:2.4cqw;border-left:1.1cqw solid transparent;font-size:4.2cqw}
+.row .v{font:600 5cqw var(--num);color:var(--dim)}
+.row.sel{background:var(--soft);border-left-color:var(--accent)}
+.row.sel .v{color:var(--ink)}
+.row.dis{opacity:.42}
+
+/* menu overlay (layer 3) */
+.menu{inset:0;background:var(--scrim)}
+.menu>*{position:absolute}
+.menu .ring{left:50%;top:41%;transform:translate(-50%,-50%);display:flex;gap:2.4cqw}
+.mi{width:12.5cqw;height:12.5cqw;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;background:var(--soft)}
+.mi svg{width:6.6cqw;height:6.6cqw;stroke:var(--dim);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mi.focus{background:var(--accent);border-color:var(--accent);transform:scale(1.18)}
+.mi.focus svg{stroke:#101114}
+.mi.locked{opacity:.25}
+.menu .name{left:0;right:0;top:55%;text-align:center;font:600 7.6cqw var(--num)}
+
+/* feedback overlay (layer 4) */
+.fb{left:50%;top:24%;transform:translateX(-50%);min-width:48cqw;max-width:66cqw;text-align:center;padding:2cqw 4cqw;border-radius:6cqw;background:var(--scrim);border:1px solid var(--line)}
+.fb b{display:block;font:600 6cqw/1.1 var(--num)}
+.vol{display:flex;gap:.9cqw;justify-content:center;margin-top:1.4cqw}
+.vol i{width:2.4cqw;height:4.2cqw;border-radius:.6cqw;background:var(--line)}
+.vol i.on{background:var(--accent)}
+.toast{left:50%;top:78%;transform:translateX(-50%);font-size:3.4cqw;padding:1.2cqw 3.4cqw;border-radius:4cqw;background:var(--scrim);border:1px solid var(--line);white-space:nowrap}
+
+/* prompt overlays (layer 5) */
+.prompt{inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1.4cqw;padding:0 9cqw}
+.prompt>*{position:static}
+.prompt h3{margin:0;font:600 9cqw/1 var(--num)}
+.prompt p{margin:0;font-size:3.8cqw;color:var(--dim)}
+.avatar{width:17cqw;height:17cqw;border-radius:50%;background:var(--soft);border:2px solid var(--ok);display:grid;place-items:center;font:600 8cqw var(--num)}
+.acts{display:flex;gap:2.4cqw;margin-top:2.4cqw}
+.act{padding:1.4cqw 3.2cqw;border-radius:5cqw;font-size:3.4cqw;font-weight:600;border:1.5px solid;white-space:nowrap}
+.act.ok{border-color:var(--ok);color:var(--ok)}.act.no{border-color:var(--bad);color:var(--bad)}.act.neutral{border-color:var(--dim);color:var(--ink)}
+.alert{border-radius:50%}
+.alert .tri{width:15cqw;height:15cqw;stroke:var(--warn);fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.alert.bad .tri{stroke:var(--bad)}
+.alert::before{content:"";position:absolute;inset:3cqw;border-radius:50%;border:1.2cqw solid var(--warn);opacity:.9}
+.alert.bad::before{border-color:var(--bad)}
+.queued{font-size:3cqw;color:var(--dim)}
+
+/* dpad affordance (layer 6) */
+.aff{left:50%;bottom:3.6%;transform:translateX(-50%);width:15cqw;height:15cqw}
+.aff svg{width:100%;height:100%}
+.aff .arm{fill:none;stroke:var(--dim);stroke-width:1;opacity:.45}
+.aff .ic{fill:var(--ink);opacity:1}
+.aff .ic.long{fill:var(--accent)}
+
+/* ---------- CONTROLS ---------- */
+.panel{background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:14px 16px;width:100%}
+.panel h2{margin:0 0 10px;font:600 15px var(--num);letter-spacing:.04em;color:var(--panel-dim)}
+.controls{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;width:100%;max-width:520px}
+.grp{display:flex;flex-direction:column;align-items:center;gap:10px}
+.grp .cap{font-size:12px;color:var(--panel-dim)}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px}
+button.hw{font:600 16px var(--num);color:var(--panel-ink);background:#23262b;border:1px solid #3a3f46;border-radius:12px;cursor:pointer;padding:0 10px;min-height:44px;touch-action:manipulation}
+button.hw:hover{border-color:var(--accent)}
+button.hw:active,button.hw.down{background:var(--accent);color:#111;border-color:var(--accent)}
+button.hw:focus-visible,.sw input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.dpad .c{border-radius:50%}
+.row3{display:flex;gap:8px}
+.col5{display:grid;grid-template-columns:repeat(2,64px);gap:8px}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:14px;border-bottom:1px solid var(--panel-line)}
+.sw:last-child{border-bottom:0}
+.sw input{position:absolute;opacity:0}
+.sw span.t{width:38px;height:22px;border-radius:12px;background:#3a3f46;position:relative;flex:none;transition:background .15s}
+.sw span.t::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked+span.t{background:var(--accent)}
+.sw input:checked+span.t::after{transform:translateX(16px)}
+.sel2{background:#23262b;color:var(--panel-ink);border:1px solid #3a3f46;border-radius:8px;padding:4px 8px;font:500 14px var(--txt)}
+.btnrow{display:flex;gap:8px;margin-top:8px}
+.btnrow button{flex:1}
+dl.insp{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:13px}
+dl.insp dt{color:var(--panel-dim)}dl.insp dd{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;word-break:break-word}
+ol.log{margin:0;padding:0;list-style:none;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:190px;overflow:auto}
+ol.log li{padding:2px 0;border-bottom:1px solid #24272c}
+ol.log li.sup{color:#ffb21f}ol.log li.na{color:var(--panel-dim)}
+.keys{font-size:12.5px;color:var(--panel-dim);line-height:1.6}
+kbd{background:#23262b;border:1px solid #3a3f46;border-radius:5px;padding:0 5px;font:12px ui-monospace,Menlo,monospace;color:var(--panel-ink)}
+.side{display:flex;flex-direction:column;gap:14px}
+.fine{font-size:11.5px;color:var(--panel-dim);margin-top:6px}
+@media (prefers-reduced-motion:no-preference){.mi{transition:transform .12s,background .12s}}
+</style>
+</head>
+<body>
+<header style="max-width:1180px;margin:0 auto">
+  <h1>Round dash prototype</h1>
+  <p class="sub">Interactive model of a 4-inch round motorcycle display: five sections, physical input routing, overlays and guard rules. All data is simulated. Student prototype, not affiliated with any motorcycle maker.</p>
+</header>
+<main class="shell">
+  <section class="col" aria-label="Display and hand controls">
+    <div class="bezel"><div class="display" id="display" data-theme="dark" role="img" aria-label="Round dashboard display">
+      <div class="layer" id="L1"></div><div class="layer" id="L2"></div><div class="layer" id="L3"></div>
+      <div class="layer" id="L4"></div><div class="layer" id="L5"></div><div class="layer" id="L6"></div>
+    </div></div>
+
+    <div class="controls">
+      <div class="grp"><div class="cap">Left hand</div>
+        <div class="dpad">
+          <span></span><button class="hw" data-in="UpButton" aria-label="Up">&#9650;</button><span></span>
+          <button class="hw" data-in="LeftButton" aria-label="Left">&#9664;</button>
+          <button class="hw c" id="centerBtn" aria-label="Center (hold for long press)">OK</button>
+          <button class="hw" data-in="RightButton" aria-label="Right">&#9654;</button>
+          <span></span><button class="hw" data-in="DownButton" aria-label="Down">&#9660;</button><span></span>
+        </div>
+        <div class="row3">
+          <button class="hw" data-in="TripButton">Trip</button>
+          <button class="hw" data-in="HomeButton">Home</button>
+          <button class="hw" data-in="PageButton">Page</button>
+        </div>
+      </div>
+      <div class="grp"><div class="cap">Right hand</div>
+        <div class="col5">
+          <button class="hw" data-in="VolumeUpButton" aria-label="Volume up">Vol +</button>
+          <button class="hw" data-in="VolumeDownButton" aria-label="Volume down">Vol &minus;</button>
+          <button class="hw" data-in="SkipBackButton" aria-label="Previous track">&#9198;</button>
+          <button class="hw" data-in="SkipForwardButton" aria-label="Next track">&#9197;</button>
+          <button class="hw" data-in="PlayPauseButton" style="grid-column:1 / span 2" aria-label="Play or pause">&#9199; Play / pause</button>
+        </div>
+      </div>
+    </div>
+    <div class="keys panel">
+      <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> D-pad &nbsp; <kbd>Enter</kbd> center (hold 0.6s = long press) &nbsp; <kbd>T</kbd> trip &nbsp; <kbd>H</kbd> home &nbsp; <kbd>P</kbd> page<br>
+      <kbd>Space</kbd> play/pause &nbsp; <kbd>[</kbd> <kbd>]</kbd> skip &nbsp; <kbd>+</kbd> <kbd>&minus;</kbd> volume
+    </div>
+  </section>
+
+  <aside class="side" aria-label="Developer controls">
+    <div class="panel">
+      <h2>Developer controls</h2>
+      <label class="sw">vehicleIsMoving<input type="checkbox" id="d_moving"><span class="t"></span></label>
+      <label class="sw">guidanceIsActive<input type="checkbox" id="d_guid"><span class="t"></span></label>
+      <label class="sw">bluetoothIsConnected<input type="checkbox" id="d_bt" checked><span class="t"></span></label>
+      <label class="sw">engineIsRunning<input type="checkbox" id="d_eng" checked><span class="t"></span></label>
+      <label class="sw">lowFuelWarning<input type="checkbox" id="d_fuel"><span class="t"></span></label>
+      <label class="sw">sideStandDown<input type="checkbox" id="d_stand"><span class="t"></span></label>
+      <label class="sw">incomingCallActive<input type="checkbox" id="d_call"><span class="t"></span></label>
+      <label class="sw">Speed data stream lost<input type="checkbox" id="d_stream"><span class="t"></span></label>
+      <label class="sw">gearPosition
+        <select class="sel2" id="d_gear"><option>N</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+      <div class="fine">Toggles are the only way to simulate sensor and phone events. The side stand alert needs a gear other than N.</div>
+    </div>
+    <div class="panel">
+      <h2>State</h2>
+      <dl class="insp" id="insp"></dl>
+    </div>
+    <div class="panel">
+      <h2>Input log</h2>
+      <ol class="log" id="log"></ol>
+      <div class="fine">Amber lines were stopped by the Button Guard Table (step 1). Grey lines have no action in the Input Routing Matrix for that context.</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+//#ENGINE-BEGIN
+/* ================= ENGINE: no DOM, all rules live here ================= */
+const SECTIONS = ['HomePage','MapPage','MusicPage','StatusPage','SettingsPage'];
+const MENU_ITEM = {HomePage:'ItemHome',MapPage:'ItemMap',MusicPage:'ItemMusic',StatusPage:'ItemStatus',SettingsPage:'ItemSettings'};
+const MAX_ZOOM = 5, MIN_ZOOM = 1, MAX_VOLUME = 10;          // placeholders (Button Guard Table notes)
+const MENU_MS = 3000, FEEDBACK_MS = 3000, TRIPINFO_MS = 5000, STREAM_MS = 1000, LONGPRESS_MS = 600;
+const TRIP_CYCLE = ['Odometer','Temperature','Range','TripA','TripB'];
+const LEFT_HAND = ['UpButton','DownButton','LeftButton','RightButton','CenterButton','TripButton','HomeButton','PageButton'];
+const MEDIA = ['PlayPauseButton','SkipForwardButton','SkipBackButton','VolumeUpButton','VolumeDownButton'];
+const DPAD = ['UpButton','DownButton','LeftButton','RightButton','CenterButton'];
+const PRIORITY = {IncomingCallOverlay:1, SafetyAlertOverlay:2};
+const TRACKS = [
+  {title:'Kerosene Sunrise', artist:'The Long Shoulders', album:'Open Road Hours', len:214},
+  {title:'Third Gear Hymn',  artist:'Mara Quill',         album:'Tarmac Psalms',   len:187},
+  {title:'Salt Flat Radio',  artist:'Hollow Pines',       album:'Mile Marker',     len:242}
+];
+const LISTS = {
+  StatusPage:   [{id:'Tires',type:'info',label:'Tire pressure'},{id:'Fuel',type:'info',label:'Fuel'},{id:'Battery',type:'info',label:'Battery'},{id:'Diagnostics',type:'action',label:'Diagnostics',lockedWhileMoving:true}],
+  SettingsPage: [{id:'Theme',type:'toggle',label:'Theme'},{id:'Units',type:'toggle',label:'Units'},{id:'ClockFormat',type:'toggle',label:'Clock'},{id:'TripReset',type:'action',label:'Reset trips'}]
+};
+
+function createEngine(){
+  const s = {
+    currentSection:'HomePage', menuIsVisible:false, menuFocusItem:'ItemHome',
+    overlayStack:[], currentFeedbackOverlay:null,
+    vehicleIsMoving:false, guidanceIsActive:false, tripInfoIsVisible:false,
+    tripWindowSelection:'Odometer', odometer:4218.4, tripA:38.2, tripB:112.7,
+    mapZoomLevel:3, listIndex:{StatusPage:0,SettingsPage:0},
+    bluetoothIsConnected:true, mediaIsPlaying:true, mediaVolume:6, trackIndex:0, trackProgress:0.3,
+    incomingCallActive:false, lowFuelWarning:false, sideStandDown:false, gearPosition:'N', engineIsRunning:true,
+    lowFuelTelltale:false, sideStandTelltale:false,
+    themeIsLight:false, distanceUnits:'imperial', clockFormat:'12h',
+    streamLost:false, streamStale:false, speed:0, rpm:1100, toast:null, log:[], simT:0
+  };
+  const timers = {}, listeners = [];
+  const start = (n,ms,fn)=>{ timers[n]={left:ms,fn}; };
+  const stop = n=>{ delete timers[n]; };
+  const emit = ()=>listeners.forEach(f=>f(s));
+  const top = ()=> s.overlayStack.length ? s.overlayStack[s.overlayStack.length-1] : null;
+  const activeOverlay = ()=> top() ? top().type : 'NONE';
+  const context = ()=> top() ? top().type : (s.menuIsVisible ? 'MainMenuOverlay' : s.currentSection);
+  const isListPage = c=> c==='StatusPage' || c==='SettingsPage';
+  const selectedItem = ()=> isListPage(s.currentSection) ? LISTS[s.currentSection][s.listIndex[s.currentSection]] : null;
+  const isDisabled = it=> !!it && s.vehicleIsMoving && (s.currentSection==='SettingsPage' || it.lockedWhileMoving===true);
+
+  /* ---- overlay helpers (Global Architecture Rules: overlay system rules) ---- */
+  function discardMenuAndFeedback(){ s.menuIsVisible=false; stop('menu'); s.currentFeedbackOverlay=null; stop('feedback'); }
+  function pushPrompt(type,kind){
+    if (s.overlayStack.some(p=>p.type===type && p.kind===kind)) return;
+    discardMenuAndFeedback();
+    s.overlayStack.push({type,kind});
+    s.overlayStack.sort((a,b)=>PRIORITY[a.type]-PRIORITY[b.type]);   // stable: newest of equal priority stays on top
+  }
+  function removePrompt(type,kind){ s.overlayStack = s.overlayStack.filter(p=>!(p.type===type && (kind===undefined || p.kind===kind))); }
+  function startMenuTimer(){ start('menu',MENU_MS,()=>{ s.menuIsVisible=false; }); }
+  function openFeedback(kind){
+    if (s.menuIsVisible || s.overlayStack.length) return;            // applied silently
+    s.currentFeedbackOverlay = {kind};
+    start('feedback',FEEDBACK_MS,()=>{ s.currentFeedbackOverlay=null; });   // new input restarts the timeout
+  }
+  function setToast(t){ s.toast=t; start('toast',1800,()=>{ s.toast=null; }); }
+
+  function nextSection(dir){
+    let i = SECTIONS.indexOf(s.currentSection);
+    for (let n=0;n<SECTIONS.length;n++){
+      i = (i+dir+SECTIONS.length)%SECTIONS.length;
+      if (SECTIONS[i]==='SettingsPage' && s.vehicleIsMoving) continue;
+      return SECTIONS[i];
+    }
+    return s.currentSection;
+  }
+
+  /* ---- Step 1: Button Guard Table ---- */
+  function suppressedBy(input,g){
+    const ctx = context(), single = g==='singlePress';
+    if (ctx==='MapPage'){
+      if (input==='LeftButton'   && !s.guidanceIsActive) return 1;
+      if (input==='CenterButton' && single && !s.guidanceIsActive) return 2;
+      if (input==='UpButton'     && s.mapZoomLevel>=MAX_ZOOM) return 3;
+      if (input==='DownButton'   && s.mapZoomLevel<=MIN_ZOOM) return 4;
+    }
+    if (ctx==='HomePage' && input==='CenterButton' && g==='longPress' && !['TripA','TripB'].includes(s.tripWindowSelection)) return 5;
+    if (SECTIONS.includes(ctx) && ctx!=='HomePage' && input==='TripButton' && single) return 6;
+    if (isListPage(ctx) && single){
+      if (input==='UpButton'   && s.listIndex[ctx]===0) return 7;
+      if (input==='DownButton' && s.listIndex[ctx]===LISTS[ctx].length-1) return 8;
+      if (input==='CenterButton' && isDisabled(selectedItem()) && s.vehicleIsMoving) return 9;
+    }
+    if (ctx==='SettingsPage' && input==='CenterButton' && single && s.vehicleIsMoving) return 10;
+    if (ctx==='MainMenuOverlay'){
+      if (input==='TripButton') return 11;
+      if (input==='UpButton' || input==='DownButton') return 12;
+    }
+    if (ctx==='IncomingCallOverlay'){
+      if (LEFT_HAND.includes(input) && input!=='CenterButton' && input!=='DownButton') return 13;
+      if (MEDIA.includes(input)) return 14;
+    }
+    if (ctx==='SafetyAlertOverlay' && LEFT_HAND.includes(input) && input!=='CenterButton' && input!=='LeftButton') return 15;
+    if (!s.bluetoothIsConnected && ['PlayPauseButton','SkipForwardButton','SkipBackButton'].includes(input)) return 16;
+    if (input==='VolumeUpButton'   && s.mediaVolume>=MAX_VOLUME) return 17;
+    if (input==='VolumeDownButton' && s.mediaVolume<=0) return 18;
+    return null;
+  }
+
+  /* ---- Step 2: ContextActionMap (Input Routing Matrix) ---- */
+  function route(ctx,input,g){
+    if (MEDIA.includes(input)) return ctx==='IncomingCallOverlay' ? null : 'media';
+    const single = g==='singlePress', long = g==='longPress';
+    switch(ctx){
+      case 'HomePage':
+        if (single && input==='PageButton') return 'pageOpen';
+        if (single && (input==='TripButton' || input==='DownButton')) return 'tripCycle';
+        if (long && input==='CenterButton') return 'tripReset';
+        return null;
+      case 'MapPage':
+        if (!single) return null;
+        return {PageButton:'pageOpen',HomeButton:'goHome',UpButton:'zoomIn',DownButton:'zoomOut',LeftButton:'cancelRoute',CenterButton:'toggleTripInfo'}[input] || null;
+      case 'MusicPage':
+        if (!single) return null;
+        return {PageButton:'pageOpen',HomeButton:'goHome'}[input] || null;
+      case 'StatusPage': case 'SettingsPage':
+        if (!single) return null;
+        return {PageButton:'pageOpen',HomeButton:'goHome',UpButton:'listUp',DownButton:'listDown',CenterButton:'activate'}[input] || null;
+      case 'MainMenuOverlay':
+        if (!single) return null;
+        return {PageButton:'menuNext',RightButton:'menuNext',LeftButton:'menuPrev',HomeButton:'goHomeDismiss',CenterButton:'menuDismiss'}[input] || null;
+      case 'IncomingCallOverlay':
+        if (!single) return null;
+        return {CenterButton:'accept',DownButton:'decline'}[input] || null;
+      case 'SafetyAlertOverlay':
+        if (!single) return null;
+        return {CenterButton:'dismissAlert',LeftButton:'dismissAlert'}[input] || null;
+    }
+    return null;
+  }
+
+  /* ---- Step 3 + 4: item overrides, execute, fire transitions in table order ---- */
+  function exec(action,input){
+    switch(action){
+      case 'pageOpen': {                                   // STT 4: navigate immediately, menu appears with it
+        const t = nextSection(1);
+        s.currentSection=t; s.menuIsVisible=true; s.menuFocusItem=MENU_ITEM[t];
+        s.currentFeedbackOverlay=null; stop('feedback'); startMenuTimer(); break; }
+      case 'menuNext': case 'menuPrev': {                  // STT 5-7
+        const t = nextSection(action==='menuNext'?1:-1);
+        s.currentSection=t; s.menuFocusItem=MENU_ITEM[t]; startMenuTimer(); break; }
+      case 'goHome': s.currentSection='HomePage'; s.menuIsVisible=false; stop('menu'); break;           // STT 3
+      case 'goHomeDismiss': s.currentSection='HomePage'; s.menuFocusItem='ItemHome'; s.menuIsVisible=false; stop('menu'); break;
+      case 'menuDismiss': s.menuIsVisible=false; stop('menu'); break;                                    // STT 1
+      case 'tripCycle': s.tripWindowSelection = TRIP_CYCLE[(TRIP_CYCLE.indexOf(s.tripWindowSelection)+1)%TRIP_CYCLE.length]; break;
+      case 'tripReset': if (s.tripWindowSelection==='TripA') s.tripA=0; else if (s.tripWindowSelection==='TripB') s.tripB=0; break;
+      case 'zoomIn': s.mapZoomLevel++; break;
+      case 'zoomOut': s.mapZoomLevel--; break;
+      case 'cancelRoute': api.setGuidance(false); break;
+      case 'toggleTripInfo':
+        if (!s.tripInfoIsVisible){ s.tripInfoIsVisible=true; start('tripinfo',TRIPINFO_MS,()=>{ s.tripInfoIsVisible=false; }); }
+        else { s.tripInfoIsVisible=false; stop('tripinfo'); }
+        break;
+      case 'listUp': s.listIndex[s.currentSection]--; break;
+      case 'listDown': s.listIndex[s.currentSection]++; break;
+      case 'activate': {                                   // ItemTypeOverrides: resolve by focused item type
+        const it = selectedItem();
+        if (!it) break;
+        if (it.id==='Theme') s.themeIsLight=!s.themeIsLight;
+        else if (it.id==='Units') s.distanceUnits = s.distanceUnits==='imperial' ? 'metric' : 'imperial';
+        else if (it.id==='ClockFormat') s.clockFormat = s.clockFormat==='12h' ? '24h' : '12h';
+        else if (it.id==='TripReset'){ s.tripA=0; s.tripB=0; setToast('Trip A and B reset'); }
+        else if (it.id==='Diagnostics') setToast('Diagnostics is out of scope');
+        break; }
+      case 'accept': case 'decline': removePrompt('IncomingCallOverlay'); s.incomingCallActive=false; break;  // STT 31, 32
+      case 'dismissAlert': s.overlayStack.pop(); break;                                                      // STT 36, 37 (telltale stays)
+      case 'media': {
+        if (input==='PlayPauseButton'){ s.mediaIsPlaying=!s.mediaIsPlaying; openFeedback('playpause'); }
+        else if (input==='SkipForwardButton'){ s.trackIndex=(s.trackIndex+1)%TRACKS.length; s.trackProgress=0; openFeedback('track'); }
+        else if (input==='SkipBackButton'){ s.trackIndex=(s.trackIndex+TRACKS.length-1)%TRACKS.length; s.trackProgress=0; openFeedback('track'); }
+        else if (input==='VolumeUpButton'){ s.mediaVolume++; openFeedback('volume'); }
+        else if (input==='VolumeDownButton'){ s.mediaVolume--; openFeedback('volume'); }
+        break; }
+    }
+  }
+
+  function press(input,gesture='singlePress'){
+    const ctx = context();
+    const entry = {input,gesture,ctx};
+    const sup = suppressedBy(input,gesture);
+    if (sup){ entry.result='suppressed'; entry.by='BGT '+sup; }
+    else {
+      const action = route(ctx,input,gesture);
+      if (!action){ entry.result='n/a'; }
+      else {
+        const menuWasOpen = ctx==='MainMenuOverlay';
+        exec(action,input);
+        if (menuWasOpen && s.menuIsVisible && action!=='menuDismiss') startMenuTimer();
+        entry.result='action'; entry.action=action;
+      }
+    }
+    s.log.unshift(entry); if (s.log.length>40) s.log.pop();
+    emit();
+    return entry;
+  }
+
+  /* ---- system events (System Event Table) ---- */
+  function evalSideStand(prev){
+    const now = s.sideStandDown && s.gearPosition!=='N';
+    if (now && !prev){ s.sideStandTelltale=true; pushPrompt('SafetyAlertOverlay','sideStand'); }
+    if (!now && prev){ s.sideStandTelltale=false; removePrompt('SafetyAlertOverlay','sideStand'); }
+  }
+  const api = {
+    state:s, press, context, activeOverlay, suppressedBy, route, selectedItem, isDisabled,
+    on:f=>listeners.push(f),
+    dpadAvailability(){
+      const ctx = context(), out = {};
+      DPAD.forEach(b=>{ out[b] = ['singlePress','longPress'].some(g=>route(ctx,b,g) && !suppressedBy(b,g)); });
+      return out;
+    },
+    setMoving(v){
+      const prev = s.vehicleIsMoving; s.vehicleIsMoving = v;
+      if (v && !prev){
+        if (s.gearPosition==='N') api.setGear('2');
+        if (s.currentSection==='SettingsPage'){          // STT 24: motion lock
+          s.currentSection='HomePage';
+          if (s.menuIsVisible){ s.menuFocusItem='ItemHome'; startMenuTimer(); }
+        }
+      }
+      emit();
+    },
+    setGuidance(v){ s.guidanceIsActive=v; if (!v){ s.tripInfoIsVisible=false; stop('tripinfo'); } emit(); },
+    setBluetooth(v){ s.bluetoothIsConnected=v; emit(); },
+    setEngine(v){ s.engineIsRunning=v; if (!v){ s.vehicleIsMoving=false; } emit(); },
+    setGear(g){ const prev = s.sideStandDown && s.gearPosition!=='N'; s.gearPosition=g; evalSideStand(prev); emit(); },
+    setSideStand(v){ const prev = s.sideStandDown && s.gearPosition!=='N'; s.sideStandDown=v; evalSideStand(prev); emit(); },
+    setLowFuel(v){
+      const prev = s.lowFuelWarning; s.lowFuelWarning=v;
+      if (v && !prev && s.engineIsRunning){ s.lowFuelTelltale=true; pushPrompt('SafetyAlertOverlay','lowFuel'); }
+      if (!v && prev){ s.lowFuelTelltale=false; removePrompt('SafetyAlertOverlay','lowFuel'); }
+      emit();
+    },
+    setIncomingCall(v){
+      if (v && !s.incomingCallActive){ s.incomingCallActive=true; pushPrompt('IncomingCallOverlay'); }
+      if (!v && s.incomingCallActive){ s.incomingCallActive=false; removePrompt('IncomingCallOverlay'); }
+      emit();
+    },
+    setStreamLost(v){ s.streamLost=v; if (v) start('stream',STREAM_MS,()=>{ s.streamStale=true; }); else { stop('stream'); s.streamStale=false; } emit(); },
+    tick(dt){
+      Object.keys(timers).forEach(n=>{ const t=timers[n]; if(!t) return; t.left-=dt; if (t.left<=0){ delete timers[n]; t.fn(); } });
+      s.simT += dt;
+      const target = s.vehicleIsMoving ? 54 + 12*Math.sin(s.simT/2600) : 0;
+      s.speed += (target-s.speed)*Math.min(1,dt/700);
+      if (s.speed<0.4 && !s.vehicleIsMoving) s.speed=0;
+      s.rpm = s.engineIsRunning ? 1100 + s.speed*58 + (s.vehicleIsMoving?180*Math.sin(s.simT/380):0) : 0;
+      if (s.vehicleIsMoving){ const mi = s.speed*dt/3600000; s.odometer+=mi; s.tripA+=mi; s.tripB+=mi; }
+      if (s.mediaIsPlaying && s.bluetoothIsConnected){ s.trackProgress += dt/(TRACKS[s.trackIndex].len*1000); if (s.trackProgress>=1) s.trackProgress=0; }
+      emit();
+    }
+  };
+  return api;
+}
+//#ENGINE-END
+
+/* ================= VIEW ================= */
+const E = createEngine();
+window.__engine = E;
+const $ = id=>document.getElementById(id);
+const last = {};
+function put(id,html){ if (last[id]!==html){ last[id]=html; $(id).innerHTML=html; } }
+
+const ICON = {
+  fuel:'<path d="M5 20V5a2 2 0 012-2h6a2 2 0 012 2v15M4 20h12M15 9h2a2 2 0 012 2v5a1.5 1.5 0 003 0V9l-3-3"/>',
+  stand:'<path d="M6 5h12M12 5v9M12 14l-5 6"/>',
+  bt:'<path d="M7 7l10 10-5 4V3l5 4L7 17"/>',
+  HomePage:'<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>',
+  MapPage:'<path d="M12 21s-6-6-6-11a6 6 0 0112 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>',
+  MusicPage:'<path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
+  StatusPage:'<path d="M4 17a8 8 0 1116 0"/><path d="M12 17l4-6"/>',
+  SettingsPage:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+  tri:'<path d="M12 3L2 20h20L12 3z"/><path d="M12 10v5M12 17.5v.5"/>'
+};
+const MENU_LABEL = {HomePage:'Home',MapPage:'Map',MusicPage:'Music',StatusPage:'Status',SettingsPage:'Settings'};
+const svg = (p,cls='')=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+
+const imperial = s=>s.distanceUnits==='imperial';
+const dist = (s,mi)=> imperial(s) ? mi : mi*1.609344;
+const du = s=> imperial(s)?'mi':'km';
+const fmt = (n,d=1)=> n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+function clockText(s){
+  const d = new Date(); let h = d.getHours(); const m = String(d.getMinutes()).padStart(2,'0');
+  if (s.clockFormat==='24h') return String(h).padStart(2,'0')+':'+m;
+  const ap = h>=12?'PM':'AM'; h = h%12 || 12; return h+':'+m+' '+ap;
+}
+
+function viewL1(s){
+  const C = 2*Math.PI*46, arc = C*0.75, frac = Math.max(0,Math.min(1,s.rpm/9000));
+  const red = Math.max(0,frac-0.8333);
+  const tell = (cls,icon,on)=>svg(icon,'tell '+(on||''));
+  return `<svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="var(--line)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${arc} ${C}" transform="rotate(135 50 50)"/>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${arc*frac} ${C}" transform="rotate(135 50 50)"/>
+    ${red>0?`<circle cx="50" cy="50" r="46" fill="none" stroke="var(--bad)" stroke-width="2.4" stroke-dasharray="${arc*red} ${C}" stroke-dashoffset="${-arc*0.8333}" transform="rotate(135 50 50)"/>`:''}
+  </svg>
+  <div class="tells">${tell('f',ICON.fuel,s.lowFuelTelltale?'on-bad':'')}${tell('s',ICON.stand,s.sideStandTelltale?'on-warn':'')}${tell('b',ICON.bt,s.bluetoothIsConnected?'on-ok':'')}</div>
+  <div class="clock">${clockText(s)}</div>`;
+}
+
+function speedText(s){
+  if (s.streamStale) return '--';
+  return String(Math.round(imperial(s)? s.speed : s.speed*1.609344));
+}
+function tripWindow(s){
+  const sel = s.tripWindowSelection;
+  if (sel==='Odometer') return ['Odometer', fmt(dist(s,s.odometer))+' '+du(s)];
+  if (sel==='Temperature') return ['Air temperature', imperial(s)?'71 °F':'22 °C'];
+  if (sel==='Range') return ['Range', Math.round(dist(s,s.lowFuelWarning?24:142))+' '+du(s)];
+  if (sel==='TripA') return ['Trip A', fmt(dist(s,s.tripA))+' '+du(s)];
+  return ['Trip B', fmt(dist(s,s.tripB))+' '+du(s)];
+}
+
+function mapView(s){
+  const k = 0.55 + 0.32*(s.mapZoomLevel-1);
+  const roads = [10,28,44,62,78,92].map((y,i)=>`<line x1="-20" x2="120" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="${i%2?1.1:2}" vector-effect="non-scaling-stroke"/>`).join('')
+    + [14,34,52,70,88].map((x,i)=>`<line y1="-20" y2="120" x1="${x}" x2="${x}" stroke="var(--line)" stroke-width="${i%2?1.1:2}" vector-effect="non-scaling-stroke"/>`).join('')
+    + `<line x1="-10" y1="90" x2="110" y2="20" stroke="var(--line)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  const route = s.guidanceIsActive ? `<path d="M50 56 L50 44 L70 44 L70 28 L88 28" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="88" cy="28" r="2.2" fill="var(--accent)"/>`:'';
+  return `<svg class="map" viewBox="0 0 100 100" aria-hidden="true"><g transform="translate(50 56) scale(${k}) translate(-50 -56)"><ellipse cx="18" cy="82" rx="14" ry="9" fill="var(--soft)"/>${roads}${route}</g>
+    <path d="M50 51 L55 62 L50 59.5 L45 62 Z" fill="var(--ink)" stroke="var(--bg)" stroke-width="1"/></svg>
+    <div class="chip l">Zoom ${s.mapZoomLevel} of ${MAX_ZOOM}</div>
+    <div class="chip r ${s.guidanceIsActive?'accent':''}">${s.guidanceIsActive?'Route active':'No route'}</div>
+    ${s.tripInfoIsVisible?`<div class="tripinfo"><div><span class="lab">Arrive</span><b>6:42 PM</b></div><div><span class="lab">Time left</span><b>18 min</b></div><div><span class="lab">Distance</span><b>${fmt(dist(s,7.4))} ${du(s)}</b></div></div>`:''}`;
+}
+function musicView(s){
+  const t = TRACKS[s.trackIndex];
+  return `<div class="disc"></div>
+    <div class="ti"><b>${t.title}</b><span class="lab">${t.artist} · ${t.album}</span></div>
+    <div class="prog"><i style="width:${(s.trackProgress*100).toFixed(1)}%"></i></div>
+    <div class="state">${s.bluetoothIsConnected ? (s.mediaIsPlaying?'Playing':'Paused') : ''}</div>
+    ${s.bluetoothIsConnected?'':'<div class="nophone">No phone connected</div>'}`;
+}
+function listView(s,title){
+  const items = LISTS[s.currentSection], sel = s.listIndex[s.currentSection];
+  const value = it=>{
+    if (E.isDisabled(it)) return 'Locked';
+    switch(it.id){
+      case 'Tires': return imperial(s)?'36 / 38 psi':'248 / 262 kPa';
+      case 'Fuel': return s.lowFuelWarning?'Low':'42%';
+      case 'Battery': return '12.6 V';
+      case 'Diagnostics': return 'Open';
+      case 'Theme': return s.themeIsLight?'Light':'Dark';
+      case 'Units': return imperial(s)?'Imperial':'Metric';
+      case 'ClockFormat': return s.clockFormat==='12h'?'12-hour':'24-hour';
+      case 'TripReset': return 'Trip A and B';
+    } return '';
+  };
+  return `<div class="list"><h2>${title}</h2>${items.map((it,i)=>`<div class="row ${i===sel?'sel':''} ${E.isDisabled(it)?'dis':''}"><span>${it.label}</span><span class="v">${value(it)}</span></div>`).join('')}</div>`;
+}
+function homeView(s){
+  const [lab,val] = tripWindow(s);
+  const fuelPct = s.lowFuelWarning?9:42;
+  return `<div class="speed"><b>${speedText(s)}</b><span>${imperial(s)?'mph':'km/h'}</span></div>
+    <div class="gear"><span class="lab">Gear</span><b>${s.streamStale?'-':s.gearPosition}</b></div>
+    <div class="fuel ${s.lowFuelWarning?'low':''}"><span class="lab">Fuel</span><b>${fuelPct}%</b><div class="bar"><i style="width:${fuelPct}%"></i></div></div>
+    <div class="tripwin"><span class="lab">${lab}</span><b>${val}</b><div class="dots">${TRIP_CYCLE.map(t=>`<i class="${t===s.tripWindowSelection?'on':''}"></i>`).join('')}</div></div>`;
+}
+function viewL2(s){
+  const c = {HomePage:homeView,MapPage:mapView,MusicPage:musicView,StatusPage:x=>listView(x,'Status'),SettingsPage:x=>listView(x,'Settings')}[s.currentSection];
+  return `<div class="page ${{HomePage:'home',MusicPage:'music'}[s.currentSection]||''}">${c(s)}</div>`;
+}
+function viewL3(s){
+  if (!s.menuIsVisible) return '';
+  return `<div class="menu"><div class="ring">${SECTIONS.map(sec=>`<div class="mi ${MENU_ITEM[sec]===s.menuFocusItem?'focus':''} ${sec==='SettingsPage'&&s.vehicleIsMoving?'locked':''}">${svg(ICON[sec])}</div>`).join('')}</div>
+    <div class="name">${MENU_LABEL[SECTIONS.find(x=>MENU_ITEM[x]===s.menuFocusItem)]}</div></div>`;
+}
+function viewL4(s){
+  let h = '';
+  const f = s.currentFeedbackOverlay;
+  if (f){
+    const t = TRACKS[s.trackIndex];
+    if (f.kind==='volume') h = `<div class="fb"><b>Volume ${s.mediaVolume}</b><div class="vol">${Array.from({length:MAX_VOLUME},(_,i)=>`<i class="${i<s.mediaVolume?'on':''}"></i>`).join('')}</div></div>`;
+    else if (f.kind==='playpause') h = `<div class="fb"><b>${s.mediaIsPlaying?'Playing':'Paused'}</b><span class="lab">${t.title}</span></div>`;
+    else h = `<div class="fb"><b>${t.title}</b><span class="lab">${t.artist}</span></div>`;
+  }
+  if (s.toast) h += `<div class="toast">${s.toast}</div>`;
+  return h;
+}
+function viewL5(s){
+  const t = E.state.overlayStack.length ? E.state.overlayStack[E.state.overlayStack.length-1] : null;
+  if (!t) return '';
+  const more = s.overlayStack.length-1;
+  const q = more>0 ? `<span class="queued">${more} more waiting</span>` : '';
+  if (t.type==='IncomingCallOverlay')
+    return `<div class="prompt"><div class="avatar">MO</div><p>Incoming call</p><h3>Maya Ortiz</h3><div class="acts"><span class="act ok">Center: Answer</span><span class="act no">Down: Decline</span></div>${q}</div>`;
+  const low = t.kind==='lowFuel';
+  return `<div class="prompt alert ${low?'':'bad'}">${svg(ICON.tri,'tri')}<h3>${low?'Low fuel':'Side stand down'}</h3><p>${low?'About 24 '+du(s)+' of range left':'Raise the stand before riding'}</p><div class="acts"><span class="act neutral">Center or Left: Dismiss</span></div>${q}</div>`;
+}
+function viewL6(s){
+  const a = E.dpadAvailability();
+  const arm = (d)=>`<path class="arm" d="${d}"/>`;
+  const long = E.state.currentSection==='HomePage' && E.context()==='HomePage';
+  return `<div class="aff"><svg viewBox="0 0 40 40" aria-label="D-pad affordance">
+    ${arm('M16 3h8v10h-8z')}${arm('M16 27h8v10h-8z')}${arm('M3 16h10v8H3z')}${arm('M27 16h10v8H27z')}<circle class="arm" cx="20" cy="20" r="6"/>
+    ${a.UpButton?'<path class="ic" d="M20 5l4 6h-8z"/>':''}
+    ${a.DownButton?'<path class="ic" d="M20 35l4-6h-8z"/>':''}
+    ${a.LeftButton?'<path class="ic" d="M5 20l6-4v8z"/>':''}
+    ${a.RightButton?'<path class="ic" d="M35 20l-6-4v8z"/>':''}
+    ${a.CenterButton?`<circle class="ic ${long?'long':''}" cx="20" cy="20" r="3.4"/>`:''}
+  </svg></div>`;
+}
+
+function render(s){
+  $('display').dataset.theme = s.themeIsLight?'light':'dark';
+  put('L1',viewL1(s)); put('L2',viewL2(s)); put('L3',viewL3(s)); put('L4',viewL4(s)); put('L5',viewL5(s)); put('L6',viewL6(s));
+  const ov = E.activeOverlay();
+  const insp = [
+    ['context',E.context()],['currentSection',s.currentSection],['menuIsVisible',s.menuIsVisible+' ('+s.menuFocusItem+')'],
+    ['activeOverlay',ov],['overlayStack',s.overlayStack.length?s.overlayStack.map(p=>p.type.replace('Overlay','')+(p.kind?':'+p.kind:'')).join(' > ')+' (top last)':'empty'],
+    ['currentFeedbackOverlay',s.currentFeedbackOverlay?s.currentFeedbackOverlay.kind:'null'],
+    ['tripWindowSelection',s.tripWindowSelection],['mapZoomLevel',s.mapZoomLevel+' / '+MAX_ZOOM],['mediaVolume',s.mediaVolume+' / '+MAX_VOLUME],
+    ['telltales','fuel '+(s.lowFuelTelltale?'on':'off')+', stand '+(s.sideStandTelltale?'on':'off')]
+  ];
+  put('insp',insp.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join(''));
+  put('log',s.log.slice(0,14).map(e=>`<li class="${e.result==='suppressed'?'sup':e.result==='n/a'?'na':''}">${e.input.replace('Button','')}.${e.gesture==='longPress'?'long':'press'} @ ${e.ctx} &rarr; ${e.result==='action'?e.action:e.result==='suppressed'?'suppressed ('+e.by+')':'n/a'}</li>`).join('')||'<li class="na">Press a button to start.</li>');
+}
+E.on(render);
+
+/* ---- hardware bindings ---- */
+document.querySelectorAll('[data-in]').forEach(b=>{
+  b.addEventListener('click',()=>E.press(b.dataset.in,'singlePress'));
+});
+(function(){
+  const b = $('centerBtn'); let t=null, fired=false;
+  const down = ()=>{ if (t!==null) return; fired=false; b.classList.add('down'); t=setTimeout(()=>{ fired=true; E.press('CenterButton','longPress'); }, LONGPRESS_MS); };
+  const up = (cancel)=>{ if (t===null) return; clearTimeout(t); t=null; b.classList.remove('down'); if (!fired && !cancel) E.press('CenterButton','singlePress'); };
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); down(); });
+  b.addEventListener('pointerup',()=>up(false));
+  b.addEventListener('pointerleave',()=>up(true));
+  b.addEventListener('pointercancel',()=>up(true));
+  b.addEventListener('keydown',e=>{ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); if(!e.repeat) down(); } });
+  b.addEventListener('keyup',e=>{ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); up(false); } });
+  window.__centerDown = down; window.__centerUp = up;
+})();
+const KEYS = {ArrowUp:'UpButton',ArrowDown:'DownButton',ArrowLeft:'LeftButton',ArrowRight:'RightButton',t:'TripButton',T:'TripButton',h:'HomeButton',H:'HomeButton',p:'PageButton',P:'PageButton',' ':'PlayPauseButton','[':'SkipBackButton',']':'SkipForwardButton','+':'VolumeUpButton','=':'VolumeUpButton','-':'VolumeDownButton','_':'VolumeDownButton'};
+let enterHeld = false;
+document.addEventListener('keydown',e=>{
+  if (e.target.closest('button,select,input')) { if (e.key!=='ArrowUp'&&e.key!=='ArrowDown'&&e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return; if (e.target.tagName==='SELECT') return; }
+  if (e.key==='Enter'){ e.preventDefault(); if(!enterHeld){ enterHeld=true; window.__centerDown(); } return; }
+  const k = KEYS[e.key]; if (!k || e.repeat) return;
+  e.preventDefault(); E.press(k,'singlePress');
+});
+document.addEventListener('keyup',e=>{ if (e.key==='Enter'){ enterHeld=false; window.__centerUp(false); } });
+
+/* ---- developer controls ---- */
+$('d_moving').addEventListener('change',e=>{ E.setMoving(e.target.checked); $('d_gear').value=E.state.gearPosition; });
+$('d_guid').addEventListener('change',e=>E.setGuidance(e.target.checked));
+$('d_bt').addEventListener('change',e=>E.setBluetooth(e.target.checked));
+$('d_eng').addEventListener('change',e=>{ E.setEngine(e.target.checked); $('d_moving').checked=E.state.vehicleIsMoving; });
+$('d_fuel').addEventListener('change',e=>E.setLowFuel(e.target.checked));
+$('d_stand').addEventListener('change',e=>E.setSideStand(e.target.checked));
+$('d_call').addEventListener('change',e=>E.setIncomingCall(e.target.checked));
+$('d_stream').addEventListener('change',e=>E.setStreamLost(e.target.checked));
+$('d_gear').addEventListener('change',e=>E.setGear(e.target.value));
+E.on(s=>{ if ($('d_call').checked!==s.incomingCallActive) $('d_call').checked=s.incomingCallActive; if ($('d_guid').checked!==s.guidanceIsActive) $('d_guid').checked=s.guidanceIsActive; });
+
+let lastT = performance.now();
+setInterval(()=>{ const n=performance.now(); E.tick(Math.min(250,n-lastT)); lastT=n; },100);
+render(E.state);
+</script>
+</body>
+</html>
