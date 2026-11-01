@@ -1,0 +1,346 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sportster S Dash Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&family=Barlow+Condensed:wght@500;600&display=swap">
+<style>
+  /* Layout: round 4" display on the left, physical controls (D-pad + page/trip/home) on the right.
+     Wireframe greys from the low-fidelity screens. The menu is a semi-transparent ring around the page. */
+  :root {
+    --bg: #FFFFFF;
+    --display: #D9D9D9;
+    --display-edge: #C9C9C9;
+    --key: #D9D9D9;
+    --key-hover: #CBCBCB;
+    --key-press: #BBBBBB;
+    --ink: #0B0B0B;
+    --ink-soft: #5A5A5A;
+    --accent: #E8641F;
+    --ring: rgba(95, 95, 95, 0.5);
+    --ring-ink: #0B0B0B;
+    --ring-focus: rgba(30, 30, 30, 0.82);
+    --ring-focus-ink: #F4F4F4;
+    --font-display: "Barlow", system-ui, sans-serif;
+    --font-body: "Barlow", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+      --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA;
+      --ring: rgba(210, 214, 220, 0.24); --ring-ink: #ECEDEF; --ring-focus: rgba(236, 237, 239, 0.88); --ring-focus-ink: #111215;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+    --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA;
+    --ring: rgba(210, 214, 220, 0.24); --ring-ink: #ECEDEF; --ring-focus: rgba(236, 237, 239, 0.88); --ring-focus-ink: #111215;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    padding-block: 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stage {
+    max-width: 980px; margin: 0 auto; min-height: 70vh;
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: center;
+  }
+  @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); min-height: 0; } }
+
+  /* ---------- Round display ---------- */
+  .screen {
+    container-type: inline-size;
+    position: relative;
+    width: min(100%, 420px);
+    aspect-ratio: 1;
+    margin-inline: auto;
+    border-radius: 50%;
+    background: var(--display);
+    border: 1px solid var(--display-edge);
+    overflow: hidden;
+    user-select: none;
+  }
+  .page-name {
+    position: absolute; inset: 0; display: grid; place-items: center; margin: 0;
+    font-family: var(--font-display); font-weight: 500; font-size: 15cqw; letter-spacing: 0; line-height: 1;
+  }
+  .menu { position: absolute; inset: 0; pointer-events: none; }
+  .menu svg { display: block; width: 100%; height: 100%; }
+  .menu .arc { fill: var(--ring); }
+  .menu text { fill: var(--ring-ink); font-family: var(--font-body); font-weight: 600; font-size: 3.5px; letter-spacing: .35px; text-transform: uppercase; }
+  .menu .item.focus .arc { fill: var(--ring-focus); }
+  .menu .item.focus text { fill: var(--ring-focus-ink); }
+  .menu .item.locked text { opacity: .4; }
+
+  /* ---------- Physical controls ---------- */
+  .controls { display: grid; justify-items: center; gap: 28px; }
+  .dpad { width: min(100%, 230px); height: auto; display: block; }
+  .dpad .seg { cursor: pointer; outline: none; }
+  .dpad .seg path, .dpad .seg rect { fill: var(--key); stroke: var(--key); stroke-width: 6; stroke-linejoin: round; }
+  .dpad .seg:hover path, .dpad .seg:hover rect { fill: var(--key-hover); stroke: var(--key-hover); }
+  .dpad .seg:active path, .dpad .seg:active rect, .dpad .seg.pressed path, .dpad .seg.pressed rect { fill: var(--key-press); stroke: var(--key-press); }
+  .dpad .seg:focus-visible path, .dpad .seg:focus-visible rect { stroke: var(--accent); }
+  .dpad .icon { fill: var(--ink-soft); pointer-events: none; }
+  .dpad .icon.center { fill: none; stroke: var(--ink-soft); stroke-width: 3; }
+  .dpad .icon[hidden] { display: none; }
+
+  .keys { display: flex; gap: 14px; }
+  .key {
+    width: 78px; height: 78px; border: 0; border-radius: 16px; background: var(--key); color: var(--ink);
+    font: 500 1rem var(--font-body); cursor: pointer;
+  }
+  .key:hover { background: var(--key-hover); }
+  .key:active, .key.pressed { background: var(--key-press); }
+  .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<main class="stage">
+  <div class="screen" id="screen">
+    <h1 class="page-name" id="pageName">Home</h1>
+    <div class="menu" id="menu" role="group" aria-label="Main menu" hidden></div>
+  </div>
+
+  <div class="controls">
+    <svg class="dpad" id="dpad" viewBox="0 0 200 200" role="group" aria-label="D-pad"></svg>
+    <div class="keys">
+      <button class="key" data-input="PageButton" type="button">page</button>
+      <button class="key" data-input="TripButton" type="button">trip</button>
+      <button class="key" data-input="HomeButton" type="button">home</button>
+    </div>
+  </div>
+</main>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(function () {
+  var SECTIONS = [
+    { id: "HomePage", label: "Home" },
+    { id: "MapPage", label: "Navigation" },
+    { id: "MusicPage", label: "Media" },
+    { id: "StatusPage", label: "Vehicle" },
+    { id: "SettingsPage", label: "Settings" }
+  ];
+  var SETTINGS = 4;
+  var MENU_TIMEOUT_MS = 3000;
+
+  // vehicleIsMoving has no on-screen control in this build; it stays FALSE.
+  var state = {
+    currentSection: 0,
+    isTopLevel: true,
+    menuIsVisible: false,
+    menuFocusItem: 0,
+    vehicleIsMoving: false
+  };
+  var timeoutId = null;
+
+  var el = {
+    pageName: document.getElementById("pageName"),
+    menu: document.getElementById("menu"),
+    live: document.getElementById("live"),
+    dpad: document.getElementById("dpad")
+  };
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function polar(cx, r, deg) {
+    var a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cx + r * Math.sin(a)];
+  }
+
+  /* ---------- Menu ring: five arcs in a semi-transparent band around the page ---------- */
+  var RING_OUTER = 50, RING_INNER = 34.6, TEXT_MID = 42.3, GAP = 1.4;
+  var ringItems = SECTIONS.map(function (s, i) {
+    var center = -90 + i * 72;
+    var a0 = center - 36 + GAP, a1 = center + 36 - GAP;
+    var g = svg("g", { "class": "item" });
+    var o0 = polar(50, RING_OUTER, a0), o1 = polar(50, RING_OUTER, a1);
+    var i1 = polar(50, RING_INNER, a1), i0 = polar(50, RING_INNER, a0);
+    g.appendChild(svg("path", {
+      "class": "arc",
+      d: "M" + o0 + " A" + RING_OUTER + " " + RING_OUTER + " 0 0 1 " + o1 +
+         " L" + i1 + " A" + RING_INNER + " " + RING_INNER + " 0 0 0 " + i0 + " Z"
+    }));
+    // Lower half: run the label path counter-clockwise so the text stays upright.
+    var lower = Math.sin(center * Math.PI / 180) > 0.01;
+    var r = lower ? TEXT_MID + 1.45 : TEXT_MID - 1.45;
+    var p0 = polar(50, r, a0), p1 = polar(50, r, a1);
+    var pathId = "ringText" + i;
+    g.appendChild(svg("path", {
+      id: pathId, fill: "none",
+      d: lower ? "M" + p1 + " A" + r + " " + r + " 0 0 0 " + p0 : "M" + p0 + " A" + r + " " + r + " 0 0 1 " + p1
+    }));
+    var t = svg("text", { "text-anchor": "middle" });
+    var tp = svg("textPath", { href: "#" + pathId, startOffset: "50%" });
+    tp.textContent = s.label;
+    t.appendChild(tp);
+    g.appendChild(t);
+    return g;
+  });
+  var ring = svg("svg", { viewBox: "0 0 100 100", "aria-hidden": "true" });
+  ringItems.forEach(function (g) { ring.appendChild(g); });
+  el.menu.appendChild(ring);
+
+  /* ---------- D-pad drawing ---------- */
+  function wedgePath(center) {
+    var R = 96, r = 56, half = 41;
+    var o1 = polar(100, R, center - half), o2 = polar(100, R, center + half);
+    var i2 = polar(100, r, center + half), i1 = polar(100, r, center - half);
+    return "M" + o1 + " A" + R + " " + R + " 0 0 1 " + o2 + " L" + i2 + " A" + r + " " + r + " 0 0 0 " + i1 + " Z";
+  }
+  var DPAD = [
+    { input: "UpButton", label: "Up", angle: -90 },
+    { input: "RightButton", label: "Right", angle: 0 },
+    { input: "DownButton", label: "Down", angle: 90 },
+    { input: "LeftButton", label: "Left", angle: 180 }
+  ];
+  var dpadIcons = {};
+  var segByInput = {};
+  DPAD.forEach(function (d) {
+    var g = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": d.label, "data-input": d.input });
+    g.appendChild(svg("path", { d: wedgePath(d.angle) }));
+    var p = polar(100, 76, d.angle);
+    var icon = svg("polygon", { "class": "icon", points: "0,-8 9,6 -9,6", transform: "translate(" + p[0] + " " + p[1] + ") rotate(" + (d.angle + 90) + ")" });
+    g.appendChild(icon);
+    el.dpad.appendChild(g);
+    dpadIcons[d.input] = icon;
+    segByInput[d.input] = g;
+  });
+  var cg = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": "Center", "data-input": "CenterButton" });
+  cg.appendChild(svg("rect", { x: 66, y: 66, width: 68, height: 68, rx: 18 }));
+  var cIcon = svg("circle", { "class": "icon center", cx: 100, cy: 100, r: 9 });
+  cg.appendChild(cIcon);
+  el.dpad.appendChild(cg);
+  dpadIcons.CenterButton = cIcon;
+  segByInput.CenterButton = cg;
+
+  /* ---------- Navigation helpers ---------- */
+  function stepIndex(from, dir) {
+    var i = from;
+    for (var n = 0; n < SECTIONS.length; n++) {
+      i = (i + dir + SECTIONS.length) % SECTIONS.length;
+      if (!(state.vehicleIsMoving && i === SETTINGS)) return i;
+    }
+    return from;
+  }
+  // currentSection and menuFocusItem change together, always.
+  function setSection(i) {
+    state.currentSection = i;
+    state.menuFocusItem = i;
+    state.isTopLevel = true;
+  }
+  function restartTimeout() {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(function () {
+      if (state.menuIsVisible) { state.menuIsVisible = false; render(); }
+    }, MENU_TIMEOUT_MS);
+  }
+  function openMenu() { state.menuIsVisible = true; restartTimeout(); }
+  function dismissMenu() { state.menuIsVisible = false; clearTimeout(timeoutId); }
+
+  /* ---------- Step 1: Button Guard Table ---------- */
+  function suppressed(input) {
+    if (state.menuIsVisible) return input === "TripButton" || input === "UpButton" || input === "DownButton";
+    return input === "TripButton" && state.currentSection !== 0;
+  }
+
+  /* ---------- Steps 2 and 3: routing (context x input) ---------- */
+  function route(input) {
+    if (state.menuIsVisible) {
+      switch (input) {
+        case "PageButton": case "RightButton": return "menuNext";
+        case "LeftButton": return "menuPrev";
+        case "CenterButton": return "menuDismiss";
+        case "HomeButton": return "homeAndDismiss";
+      }
+      return null;
+    }
+    switch (input) {
+      case "PageButton": return "openMenuNext";
+      case "HomeButton": return state.currentSection !== 0 ? "goHome" : null;
+    }
+    return null;
+  }
+
+  /* ---------- Step 4: execute ---------- */
+  function execute(action) {
+    switch (action) {
+      case "openMenuNext": setSection(stepIndex(state.currentSection, 1)); openMenu(); break;
+      case "menuNext": setSection(stepIndex(state.currentSection, 1)); restartTimeout(); break;
+      case "menuPrev": setSection(stepIndex(state.currentSection, -1)); restartTimeout(); break;
+      case "menuDismiss": dismissMenu(); break;
+      case "homeAndDismiss": setSection(0); dismissMenu(); break;
+      case "goHome": setSection(0); break;
+    }
+  }
+
+  function handle(input) {
+    if (!suppressed(input)) {
+      var action = route(input);
+      if (action) execute(action);
+    }
+    render();
+  }
+
+  /* ---------- Rendering ---------- */
+  function render() {
+    var cur = SECTIONS[state.currentSection];
+    el.pageName.textContent = cur.label;
+    el.menu.hidden = !state.menuIsVisible;
+    ringItems.forEach(function (g, i) {
+      g.classList.toggle("focus", i === state.menuFocusItem);
+      g.classList.toggle("locked", state.vehicleIsMoving && i === SETTINGS);
+    });
+    Object.keys(dpadIcons).forEach(function (input) {
+      var active = !suppressed(input) && route(input) !== null;
+      if (active) dpadIcons[input].removeAttribute("hidden");
+      else dpadIcons[input].setAttribute("hidden", "");
+    });
+    el.live.textContent = cur.label + (state.menuIsVisible ? ", main menu open" : "");
+  }
+
+  /* ---------- Wiring ---------- */
+  function flash(node) {
+    node.classList.add("pressed");
+    setTimeout(function () { node.classList.remove("pressed"); }, 110);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (node) {
+    node.addEventListener("click", function () { handle(node.getAttribute("data-input")); });
+    if (node.tagName.toLowerCase() === "g") {
+      node.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); flash(node); handle(node.getAttribute("data-input")); }
+      });
+    }
+  });
+
+  var KEYMAP = {
+    ArrowUp: "UpButton", ArrowDown: "DownButton", ArrowLeft: "LeftButton", ArrowRight: "RightButton",
+    Enter: "CenterButton", p: "PageButton", t: "TripButton", h: "HomeButton"
+  };
+  document.addEventListener("keydown", function (e) {
+    if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+    var input = KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!input) return;
+    e.preventDefault();
+    var node = segByInput[input] || document.querySelector('.key[data-input="' + input + '"]');
+    if (node) flash(node);
+    handle(input);
+  });
+
+  render();
+})();
+</script>
+
+</body></html>
