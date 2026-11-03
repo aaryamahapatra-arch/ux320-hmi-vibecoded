@@ -198,7 +198,7 @@
 
     <div class="menu" id="menu" aria-hidden="true" hidden></div>
 
-    <div class="ov volume" id="fbVolume" aria-hidden="true" hidden>Volume</div>
+    <div class="ov volume" id="fbVolume" aria-hidden="true" hidden>Volume increase</div>
     <div class="ov pill" id="fbPill" aria-hidden="true" hidden>Settings are hidden while riding</div>
 
     <div class="ov prompt" id="prompt" role="alertdialog" aria-labelledby="promptTitle" hidden>
@@ -594,7 +594,7 @@
         if (state.tripInfoIsVisible) hideTripInfo();
         else { state.guidanceIsActive = true; setSection(MAP); dismissMenu(); showTripInfo(); }
         break;
-      case "volumeBurst": showFeedback("volume", "Volume"); break;
+      case "volumeBurst": showFeedback("volume", "Volume increase"); break;
       case "settingsHidden":
         state.vehicleIsMoving = true;
         setSection(SETTINGS);
