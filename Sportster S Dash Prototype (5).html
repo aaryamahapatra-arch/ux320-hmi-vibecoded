@@ -1,0 +1,348 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sportster S Dash Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&display=swap">
+<style>
+  /* Layout: round 4" display on the left, physical controls (D-pad + page/trip/home) on the right.
+     Wireframe greys from the low-fidelity screens. The menu is a plain grey ring around the page name. */
+  :root {
+    --bg: #FFFFFF;
+    --display: #D9D9D9;
+    --display-edge: #C9C9C9;
+    --key: #D9D9D9;
+    --key-hover: #CBCBCB;
+    --key-press: #BBBBBB;
+    --ink: #0B0B0B;
+    --ink-soft: #5A5A5A;
+    --accent: #E8641F;
+    --ring: #A5A5A5;
+    --font-body: "Barlow", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+      --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+    --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    padding-block: 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stage {
+    max-width: 980px; margin: 0 auto; min-height: 70vh;
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: center;
+  }
+  @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); min-height: 0; } }
+
+  /* ---------- Round display ---------- */
+  .screen {
+    container-type: inline-size;
+    position: relative;
+    width: min(100%, 420px);
+    aspect-ratio: 1;
+    margin-inline: auto;
+    border-radius: 50%;
+    background: var(--display);
+    overflow: hidden;
+    user-select: none;
+  }
+  .page {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5cqw;
+  }
+  .page-name { margin: 0; font-weight: 500; font-size: 16cqw; line-height: 1; }
+  .trip {
+    width: 66cqw; padding: 2cqw 3cqw 2.4cqw; display: grid; justify-items: center; gap: .6cqw;
+    border: .35cqw solid var(--ink);
+  }
+  .trip-label { font-size: 11cqw; font-weight: 500; line-height: 1; }
+  .zoom { margin: 0; font-size: 5.6cqw; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+  /* Menu overlay: a grey ring around the page name. Inner radius is 69.2% of the display radius. */
+  .menu {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle closest-side, transparent 69%, var(--ring) 69.3%);
+  }
+
+  /* ---------- Physical controls ---------- */
+  .controls { display: grid; justify-items: center; gap: 28px; }
+  .dpad { width: min(100%, 230px); height: auto; display: block; }
+  .dpad .seg { cursor: pointer; outline: none; }
+  .dpad .seg path, .dpad .seg rect { fill: var(--key); stroke: var(--key); stroke-width: 6; stroke-linejoin: round; }
+  .dpad .seg:hover path, .dpad .seg:hover rect { fill: var(--key-hover); stroke: var(--key-hover); }
+  .dpad .seg:active path, .dpad .seg:active rect, .dpad .seg.pressed path, .dpad .seg.pressed rect { fill: var(--key-press); stroke: var(--key-press); }
+  .dpad .seg:focus-visible path, .dpad .seg:focus-visible rect { stroke: var(--accent); }
+  .dpad .icon { fill: var(--ink-soft); pointer-events: none; }
+  .dpad .icon.center { fill: none; stroke: var(--ink-soft); stroke-width: 3; }
+  .dpad .icon[hidden] { display: none; }
+
+  .keys { display: flex; gap: 14px; }
+  .key {
+    width: 78px; height: 78px; border: 0; border-radius: 16px; background: var(--key); color: var(--ink);
+    font: 500 1rem var(--font-body); cursor: pointer;
+  }
+  .key:hover { background: var(--key-hover); }
+  .key:active, .key.pressed { background: var(--key-press); }
+  .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<main class="stage">
+  <div class="screen" id="screen">
+    <div class="page">
+      <h1 class="page-name" id="pageName">Home</h1>
+      <div class="trip" id="trip" aria-hidden="true">
+        <span class="trip-label" id="tripLabel">Odometer</span>
+      </div>
+      <p class="zoom" id="zoom" hidden>Default zoom</p>
+    </div>
+    <div class="menu" id="menu" aria-hidden="true" hidden></div>
+  </div>
+
+  <div class="controls">
+    <svg class="dpad" id="dpad" viewBox="0 0 200 200" role="group" aria-label="D-pad"></svg>
+    <div class="keys">
+      <button class="key" data-input="PageButton" type="button">page</button>
+      <button class="key" data-input="TripButton" type="button">trip</button>
+      <button class="key" data-input="HomeButton" type="button">home</button>
+    </div>
+  </div>
+</main>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(function () {
+  var SECTIONS = [
+    { id: "HomePage", label: "Home" },
+    { id: "MapPage", label: "Navigation" },
+    { id: "MusicPage", label: "Media" },
+    { id: "StatusPage", label: "Vehicle" },
+    { id: "SettingsPage", label: "Settings" }
+  ];
+  // Trip window order from the Input Routing Matrix: Odometer > Temperature > Range > TripA > TripB > Odometer.
+  // Only the title is shown; no values.
+  var TRIP_WINDOW = [
+    { id: "Odometer", label: "Odometer" },
+    { id: "Temperature", label: "Temperature" },
+    { id: "Range", label: "Range" },
+    { id: "TripA", label: "Trip A" },
+    { id: "TripB", label: "Trip B" }
+  ];
+  // Map zoom: Up zooms in, Down zooms out. MIN_ZOOM and MAX_ZOOM are the guard limits.
+  var MAP = 1, MIN_ZOOM = 0, MAX_ZOOM = 2;
+  var ZOOM_TEXT = ["Zoomed out", "Default zoom", "Zoomed in"];
+  var SETTINGS = 4;
+  var MENU_TIMEOUT_MS = 3000;
+
+  // vehicleIsMoving has no on-screen control in this build; it stays FALSE.
+  var state = {
+    currentSection: 0,
+    isTopLevel: true,
+    menuIsVisible: false,
+    menuFocusItem: 0,
+    vehicleIsMoving: false,
+    tripWindowSelection: 0,
+    mapZoomLevel: 1
+  };
+  var timeoutId = null;
+
+  var el = {
+    pageName: document.getElementById("pageName"),
+    trip: document.getElementById("trip"),
+    tripLabel: document.getElementById("tripLabel"),
+    zoom: document.getElementById("zoom"),
+    menu: document.getElementById("menu"),
+    live: document.getElementById("live"),
+    dpad: document.getElementById("dpad")
+  };
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function polar(cx, r, deg) {
+    var a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cx + r * Math.sin(a)];
+  }
+
+  /* ---------- D-pad drawing ---------- */
+  function wedgePath(center) {
+    var R = 96, r = 56, half = 41;
+    var o1 = polar(100, R, center - half), o2 = polar(100, R, center + half);
+    var i2 = polar(100, r, center + half), i1 = polar(100, r, center - half);
+    return "M" + o1 + " A" + R + " " + R + " 0 0 1 " + o2 + " L" + i2 + " A" + r + " " + r + " 0 0 0 " + i1 + " Z";
+  }
+  var DPAD = [
+    { input: "UpButton", label: "Up", angle: -90 },
+    { input: "RightButton", label: "Right", angle: 0 },
+    { input: "DownButton", label: "Down", angle: 90 },
+    { input: "LeftButton", label: "Left", angle: 180 }
+  ];
+  var dpadIcons = {};
+  var segByInput = {};
+  DPAD.forEach(function (d) {
+    var g = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": d.label, "data-input": d.input });
+    g.appendChild(svg("path", { d: wedgePath(d.angle) }));
+    var p = polar(100, 76, d.angle);
+    var icon = svg("polygon", { "class": "icon", points: "0,-8 9,6 -9,6", transform: "translate(" + p[0] + " " + p[1] + ") rotate(" + (d.angle + 90) + ")" });
+    g.appendChild(icon);
+    el.dpad.appendChild(g);
+    dpadIcons[d.input] = icon;
+    segByInput[d.input] = g;
+  });
+  var cg = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": "Center", "data-input": "CenterButton" });
+  cg.appendChild(svg("rect", { x: 66, y: 66, width: 68, height: 68, rx: 18 }));
+  var cIcon = svg("circle", { "class": "icon center", cx: 100, cy: 100, r: 9 });
+  cg.appendChild(cIcon);
+  el.dpad.appendChild(cg);
+  dpadIcons.CenterButton = cIcon;
+  segByInput.CenterButton = cg;
+
+  /* ---------- Navigation helpers ---------- */
+  function stepIndex(from, dir) {
+    var i = from;
+    for (var n = 0; n < SECTIONS.length; n++) {
+      i = (i + dir + SECTIONS.length) % SECTIONS.length;
+      if (!(state.vehicleIsMoving && i === SETTINGS)) return i;
+    }
+    return from;
+  }
+  // currentSection and menuFocusItem change together, always.
+  function setSection(i) {
+    state.currentSection = i;
+    state.menuFocusItem = i;
+    state.isTopLevel = true;
+  }
+  function restartTimeout() {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(function () {
+      if (state.menuIsVisible) { state.menuIsVisible = false; render(); }
+    }, MENU_TIMEOUT_MS);
+  }
+  function openMenu() { state.menuIsVisible = true; restartTimeout(); }
+  function dismissMenu() { state.menuIsVisible = false; clearTimeout(timeoutId); }
+
+  /* ---------- Step 1: Button Guard Table ---------- */
+  function suppressed(input) {
+    if (state.menuIsVisible) return input === "TripButton" || input === "UpButton" || input === "DownButton";
+    if (state.currentSection === MAP) {
+      if (input === "UpButton" && state.mapZoomLevel >= MAX_ZOOM) return true;
+      if (input === "DownButton" && state.mapZoomLevel <= MIN_ZOOM) return true;
+    }
+    return input === "TripButton" && state.currentSection !== 0;
+  }
+
+  /* ---------- Steps 2 and 3: routing (context x input) ---------- */
+  function route(input) {
+    if (state.menuIsVisible) {
+      switch (input) {
+        case "PageButton": case "RightButton": return "menuNext";
+        case "LeftButton": return "menuPrev";
+        case "CenterButton": return "menuDismiss";
+        case "HomeButton": return "homeAndDismiss";
+      }
+      return null;
+    }
+    var onHome = state.currentSection === 0;
+    var onMap = state.currentSection === MAP;
+    switch (input) {
+      case "PageButton": return "openMenuNext";
+      case "HomeButton": return onHome ? null : "goHome";
+      case "TripButton": return onHome ? "tripNext" : null;
+      case "UpButton": return onMap ? "zoomIn" : null;
+      case "DownButton": return onHome ? "tripNext" : onMap ? "zoomOut" : null;
+    }
+    return null;
+  }
+
+  /* ---------- Step 4: execute ---------- */
+  function execute(action) {
+    switch (action) {
+      case "openMenuNext": setSection(stepIndex(state.currentSection, 1)); openMenu(); break;
+      case "menuNext": setSection(stepIndex(state.currentSection, 1)); restartTimeout(); break;
+      case "menuPrev": setSection(stepIndex(state.currentSection, -1)); restartTimeout(); break;
+      case "menuDismiss": dismissMenu(); break;
+      case "homeAndDismiss": setSection(0); dismissMenu(); break;
+      case "goHome": setSection(0); break;
+      case "tripNext": state.tripWindowSelection = (state.tripWindowSelection + 1) % TRIP_WINDOW.length; break;
+      case "zoomIn": state.mapZoomLevel += 1; break;
+      case "zoomOut": state.mapZoomLevel -= 1; break;
+    }
+  }
+
+  function handle(input) {
+    if (!suppressed(input)) {
+      var action = route(input);
+      if (action) execute(action);
+    }
+    render();
+  }
+
+  /* ---------- Rendering ---------- */
+  function render() {
+    var cur = SECTIONS[state.currentSection];
+    var trip = TRIP_WINDOW[state.tripWindowSelection];
+    var showTrip = state.currentSection === 0 && !state.menuIsVisible;
+    el.pageName.textContent = cur.label;
+    el.tripLabel.textContent = trip.label;
+    el.trip.hidden = !showTrip;
+    var showZoom = state.currentSection === MAP && !state.menuIsVisible;
+    el.zoom.textContent = ZOOM_TEXT[state.mapZoomLevel];
+    el.zoom.hidden = !showZoom;
+    el.menu.hidden = !state.menuIsVisible;
+    Object.keys(dpadIcons).forEach(function (input) {
+      var active = !suppressed(input) && route(input) !== null;
+      if (active) dpadIcons[input].removeAttribute("hidden");
+      else dpadIcons[input].setAttribute("hidden", "");
+    });
+    el.live.textContent = cur.label + (showTrip ? ", " + trip.label : "") + (showZoom ? ", " + ZOOM_TEXT[state.mapZoomLevel] : "") + (state.menuIsVisible ? ", main menu open" : "");
+  }
+
+  /* ---------- Wiring ---------- */
+  function flash(node) {
+    node.classList.add("pressed");
+    setTimeout(function () { node.classList.remove("pressed"); }, 110);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (node) {
+    node.addEventListener("click", function () { handle(node.getAttribute("data-input")); });
+    if (node.tagName.toLowerCase() === "g") {
+      node.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); flash(node); handle(node.getAttribute("data-input")); }
+      });
+    }
+  });
+
+  var KEYMAP = {
+    ArrowUp: "UpButton", ArrowDown: "DownButton", ArrowLeft: "LeftButton", ArrowRight: "RightButton",
+    Enter: "CenterButton", p: "PageButton", t: "TripButton", h: "HomeButton"
+  };
+  document.addEventListener("keydown", function (e) {
+    if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+    var input = KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!input) return;
+    e.preventDefault();
+    var node = segByInput[input] || document.querySelector('.key[data-input="' + input + '"]');
+    if (node) flash(node);
+    handle(input);
+  });
+
+  render();
+})();
+</script>
+
+</body></html>
