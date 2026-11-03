@@ -1,0 +1,740 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sportser_S_Prototype03.02</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&display=swap">
+<style>
+  /* Layout: round 4" display on the left; physical controls and developer panel on the right.
+     Layer stack inside the display, bottom to top: page (1) > guidance banners (2) > MainMenuOverlay (3)
+     > MediaFeedbackOverlay (4) > PromptOverlay (5). Wireframe greys, flat blocks, no decoration. */
+  :root {
+    --bg: #FFFFFF;
+    --display: #D9D9D9;
+    --display-edge: #C9C9C9;
+    --key: #D9D9D9;
+    --key-hover: #CBCBCB;
+    --key-press: #BBBBBB;
+    --ink: #0B0B0B;
+    --ink-soft: #5A5A5A;
+    --accent: #E8641F;
+    --ring: #A5A5A5;
+    --panel: #F3F3F3;
+    --line: #D0D0D0;
+    --font-body: "Barlow", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+      --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D; --panel: #3A3E45; --line: #3B3F46;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+    --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D; --panel: #3A3E45; --line: #3B3F46;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    padding-block: 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stage {
+    max-width: 980px; margin: 0 auto; min-height: 70vh;
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: center;
+  }
+  @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); min-height: 0; } }
+
+  /* ---------- Round display ---------- */
+  .screen {
+    container-type: inline-size;
+    position: relative;
+    width: min(100%, 420px);
+    aspect-ratio: 1;
+    margin-inline: auto;
+    border-radius: 50%;
+    background: var(--display);
+    overflow: hidden;
+    user-select: none;
+  }
+  .page {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5cqw;
+  }
+  .page-name { margin: 0; font-weight: 500; font-size: 16cqw; line-height: 1; }
+  .trip {
+    width: 66cqw; padding: 2cqw 3cqw 2.4cqw; display: grid; justify-items: center; gap: .6cqw;
+    border: .35cqw solid var(--ink);
+  }
+  .trip-label { font-size: 11cqw; font-weight: 500; line-height: 1; }
+  .zoom { margin: 0; font-size: 5.6cqw; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+  /* Menu overlay: a grey ring around the page name. Inner radius is 69.2% of the display radius. */
+  .menu {
+    position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background: radial-gradient(circle closest-side, transparent 69%, var(--ring) 69.3%);
+  }
+
+  /* ---------- Overlay blocks (shared) ---------- */
+  .ov { position: absolute; background: var(--panel); color: var(--ink); border: 0 solid var(--ink); text-align: center; }
+
+  /* Directions: block over the top half. Non-interactive. */
+  .directions {
+    z-index: 2; left: 0; right: 0; top: 0; height: 50%; border-bottom-width: .5cqw;
+    display: flex; align-items: center; justify-content: center; padding-top: 12cqw;
+  }
+  .dir-row { display: flex; align-items: center; gap: 4cqw; max-width: 80cqw; text-align: left; }
+  .dir-arrow { width: 13cqw; height: 13cqw; flex: none; }
+  .dir-arrow path { fill: none; stroke: var(--ink); stroke-width: 7; stroke-linecap: square; stroke-linejoin: miter; }
+  .dir-dist { margin: 0; font-size: 6cqw; font-weight: 600; line-height: 1.1; }
+  .dir-street { margin: .6cqw 0 0; font-size: 7.4cqw; font-weight: 500; line-height: 1.1; text-wrap: balance; }
+
+  /* Trip information: block of about one fifth of the display height, near the bottom. */
+  .tripinfo {
+    z-index: 2; left: 50%; transform: translateX(-50%); bottom: 12cqw; width: 60cqw; height: 20cqw; border-width: .4cqw;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
+  }
+  .ti-cell { display: grid; gap: .6cqw; justify-items: center; }
+  .ti-val { font-size: 5.2cqw; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .ti-lab { font-size: 2.9cqw; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); line-height: 1.1; }
+
+  /* MediaFeedbackOverlay variants: volume fills the display; the settings notice is a pill. */
+  .volume {
+    z-index: 4; inset: 0; display: flex; align-items: center; justify-content: center; padding: 10cqw;
+    font-size: 12cqw; font-weight: 600; line-height: 1.05; text-wrap: balance;
+  }
+  .pill {
+    z-index: 4; left: 50%; top: 38%; transform: translate(-50%, -50%); width: 82cqw; padding: 8cqw 9cqw;
+    border-width: .5cqw; border-radius: 999px; font-size: 7.4cqw; font-weight: 500; line-height: 1.15; text-wrap: balance;
+  }
+
+  /* PromptOverlay: interactive block over the bottom half. Captures the D-pad. */
+  .prompt {
+    z-index: 5; left: 0; right: 0; bottom: 0; height: 50%; border-top-width: .5cqw;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1.6cqw; padding: 4cqw 12cqw 0;
+  }
+  .prompt-title { margin: 0; font-size: 8.4cqw; font-weight: 600; line-height: 1.05; text-wrap: balance; }
+  .prompt-sub { margin: 0; font-size: 5.2cqw; font-weight: 500; line-height: 1.15; color: var(--ink-soft); text-wrap: balance; }
+  .prompt-hints { margin: .8cqw 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: .6cqw 4cqw; font-size: 4.4cqw; font-weight: 600; letter-spacing: .03em; }
+  .prompt-hints span { border: .35cqw solid var(--ink); padding: .8cqw 2.2cqw; }
+
+  /* ---------- Physical controls ---------- */
+  .controls { display: grid; justify-items: center; gap: 28px; }
+  .dpad { width: min(100%, 230px); height: auto; display: block; }
+  .dpad .seg { cursor: pointer; outline: none; }
+  .dpad .seg path, .dpad .seg rect { fill: var(--key); stroke: var(--key); stroke-width: 6; stroke-linejoin: round; }
+  .dpad .seg:hover path, .dpad .seg:hover rect { fill: var(--key-hover); stroke: var(--key-hover); }
+  .dpad .seg:active path, .dpad .seg:active rect, .dpad .seg.pressed path, .dpad .seg.pressed rect { fill: var(--key-press); stroke: var(--key-press); }
+  .dpad .seg:focus-visible path, .dpad .seg:focus-visible rect { stroke: var(--accent); }
+  .dpad .icon { fill: var(--ink-soft); pointer-events: none; }
+  .dpad .icon.center { fill: none; stroke: var(--ink-soft); stroke-width: 3; }
+  .dpad .icon[hidden] { display: none; }
+
+  .keys { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .key {
+    width: 78px; height: 78px; border: 0; border-radius: 16px; background: var(--key); color: var(--ink);
+    font: 500 1rem var(--font-body); cursor: pointer;
+  }
+  .key:hover { background: var(--key-hover); }
+  .key:active, .key.pressed { background: var(--key-press); }
+  .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Developer panel ---------- */
+  .dev { width: min(100%, 420px); display: grid; gap: 14px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .dev-title { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+  .dev-group { display: grid; gap: 8px; }
+  .dev-label { margin: 0; font-size: .85rem; font-weight: 600; }
+  .dev-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dev-btn {
+    min-height: 40px; padding: 8px 14px; border: 1px solid var(--ink-soft); border-radius: 8px; background: transparent; color: var(--ink);
+    font: 500 .95rem var(--font-body); cursor: pointer;
+  }
+  .dev-btn:hover { background: var(--key-hover); }
+  .dev-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .dev-btn:focus-visible, .sw input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .sw { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; font-size: .95rem; cursor: pointer; }
+  .sw input { width: 20px; height: 20px; accent-color: var(--ink); }
+  .queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .q-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: .95rem; }
+  .q-row.now { border-color: var(--ink); }
+  .q-tier { font-weight: 600; font-size: .8rem; letter-spacing: .06em; color: var(--ink-soft); }
+  .q-status { font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+  .q-row.now .q-status { color: var(--ink); }
+  .q-empty { font-size: .95rem; color: var(--ink-soft); }
+  .dev-note { margin: 0; font-size: .8rem; line-height: 1.4; color: var(--ink-soft); }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<main class="stage">
+  <div class="screen" id="screen">
+    <div class="page">
+      <h1 class="page-name" id="pageName">Home</h1>
+      <div class="trip" id="trip" aria-hidden="true">
+        <span class="trip-label" id="tripLabel">Odometer</span>
+      </div>
+      <p class="zoom" id="zoom" hidden>Default zoom</p>
+    </div>
+
+    <div class="ov directions" id="directions" hidden>
+      <div class="dir-row">
+        <svg class="dir-arrow" viewBox="0 0 100 100" aria-hidden="true"><path d="M22 92 V52 H72 M52 30 L76 52 L52 74"/></svg>
+        <div>
+          <p class="dir-dist">0.4 mi</p>
+          <p class="dir-street">Turn right onto E Montgomery</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov tripinfo" id="tripInfo" hidden>
+      <div class="ti-cell"><span class="ti-val">10 min</span><span class="ti-lab">Left in trip</span></div>
+      <div class="ti-cell"><span class="ti-val">4:53 PM</span><span class="ti-lab">Arrival</span></div>
+      <div class="ti-cell"><span class="ti-val">5.1 mi</span><span class="ti-lab">To go</span></div>
+    </div>
+
+    <div class="menu" id="menu" aria-hidden="true" hidden></div>
+
+    <div class="ov volume" id="fbVolume" aria-hidden="true" hidden>Volume</div>
+    <div class="ov pill" id="fbPill" aria-hidden="true" hidden>Settings are hidden while riding</div>
+
+    <div class="ov prompt" id="prompt" role="alertdialog" aria-labelledby="promptTitle" hidden>
+      <h2 class="prompt-title" id="promptTitle">Incoming call</h2>
+      <p class="prompt-sub" id="promptSub">Jordan Lee</p>
+      <div class="prompt-hints" id="promptHints"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <svg class="dpad" id="dpad" viewBox="0 0 200 200" role="group" aria-label="D-pad"></svg>
+    <div class="keys">
+      <button class="key" data-input="PageButton" type="button">page</button>
+      <button class="key" data-input="TripButton" type="button">trip</button>
+      <button class="key" data-input="HomeButton" type="button">home</button>
+    </div>
+    <div class="keys">
+      <button class="key" data-input="VolumeDownButton" type="button" aria-label="Volume down">vol &minus;</button>
+      <button class="key" data-input="VolumeUpButton" type="button" aria-label="Volume up">vol +</button>
+    </div>
+
+    <section class="dev" aria-labelledby="devTitle">
+      <h2 class="dev-title" id="devTitle">Developer controls</h2>
+      <div class="dev-group">
+        <label class="sw" for="devMoving"><input type="checkbox" id="devMoving"> vehicleIsMoving</label>
+        <label class="sw" for="devGuidance"><input type="checkbox" id="devGuidance"> guidanceIsActive</label>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Prompts (D-pad captured)</p>
+        <div class="dev-row">
+          <button class="dev-btn" type="button" data-dev="call" aria-pressed="false">Incoming call</button>
+          <button class="dev-btn" type="button" data-dev="lowTire" aria-pressed="false">Low tire pressure</button>
+          <button class="dev-btn" type="button" data-dev="lowFuel" aria-pressed="false">Low fuel</button>
+          <button class="dev-btn" type="button" data-dev="sideStand" aria-pressed="false">Side stand down</button>
+          <button class="dev-btn" type="button" data-dev="hangup">Caller hangs up</button>
+        </div>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Other overlays</p>
+        <div class="dev-row">
+          <button class="dev-btn" type="button" data-dev="directions" aria-pressed="false">Directions</button>
+          <button class="dev-btn" type="button" data-dev="tripInfo" aria-pressed="false">Trip information</button>
+          <button class="dev-btn" type="button" data-dev="volumeBurst">Volume overlay</button>
+          <button class="dev-btn" type="button" data-dev="settingsHidden">Locked Settings</button>
+          <button class="dev-btn" type="button" data-dev="clear">Clear all</button>
+        </div>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Notification queue</p>
+        <ol class="queue" id="queueList" aria-label="Notification queue"></ol>
+        <p class="dev-note">Priority, highest first: T1 interactive prompts (safety alerts before calls), T2 media feedback, T3 main menu, T4 user and system content. A higher tier shows first and lower ones wait in line, then appear in order when it clears. The menu and the page content are not queued: a prompt closes the menu, and the page stays underneath.</p>
+      </div>
+      <p class="dev-note">Try it: open a prompt, then press Volume overlay and Locked Settings (turns vehicleIsMoving on and opens Settings). Both wait until you answer the prompt. Directions and trip information turn guidanceIsActive on and open the Navigation page; both show on that page only. The guidance banner stays up while guidance is active, and trip information is also toggled by Center on that page. Alert prompts stay pressed while their condition is active, even after the rider dismisses them. With vehicleIsMoving on, Settings stays in the menu. The "Settings are hidden" pill stays on the Settings page while the vehicle moves and the menu is closed, never over the menu.</p>
+    </section>
+  </div>
+</main>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(function () {
+  var SECTIONS = [
+    { id: "HomePage", label: "Home" },
+    { id: "MapPage", label: "Navigation" },
+    { id: "MusicPage", label: "Media" },
+    { id: "StatusPage", label: "Vehicle" },
+    { id: "SettingsPage", label: "Settings" }
+  ];
+  // Trip window order from the Input Routing Matrix: Odometer > Temperature > Range > TripA > TripB > Odometer.
+  // Only the title is shown; no values.
+  var TRIP_WINDOW = [
+    { id: "Odometer", label: "Odometer" },
+    { id: "Temperature", label: "Temperature" },
+    { id: "Range", label: "Range" },
+    { id: "TripA", label: "Trip A" },
+    { id: "TripB", label: "Trip B" }
+  ];
+  // Map zoom: Up zooms in, Down zooms out. MIN_ZOOM and MAX_ZOOM are the guard limits.
+  var MAP = 1, MIN_ZOOM = 0, MAX_ZOOM = 2;
+  var ZOOM_TEXT = ["Zoomed out", "Default zoom", "Zoomed in"];
+  var SETTINGS = 4;
+  var MENU_TIMEOUT_MS = 3000;
+  var FEEDBACK_TIMEOUT_MS = 3000;
+  var TRIPINFO_TIMEOUT_MS = 5000;
+  var MAX_VOLUME = 20; // placeholder limit, to confirm
+
+  // Prompt overlays. Priority from the System Event Table: SafetyAlert (3) > IncomingCall (2).
+  // Low tire pressure is not in the specs; it is treated as a SafetyAlertOverlay (assumption to confirm).
+  var PROMPTS = {
+    call:      { priority: 2, alert: false, title: "Incoming call", sub: "Jordan Lee",
+                 hints: ["Center: Accept", "Down: Decline"] },
+    lowTire:   { priority: 3, alert: true, title: "Low tire pressure", sub: "Front tire 24 psi",
+                 hints: ["Center or Left: Dismiss"] },
+    lowFuel:   { priority: 3, alert: true, title: "Low fuel", sub: "0.8 gal remaining",
+                 hints: ["Center or Left: Dismiss"] },
+    sideStand: { priority: 3, alert: true, title: "Side stand down", sub: "Raise the stand before riding",
+                 hints: ["Center or Left: Dismiss"] }
+  };
+
+  // vehicleIsMoving and guidanceIsActive are driven from the developer panel.
+  // bluetoothIsConnected is assumed TRUE in this build.
+  // Merged onto the live version (1793660129-2282): its page, menu, trip window and map zoom logic is kept as is.
+  var state = {
+    currentSection: 0,
+    isTopLevel: true,
+    menuIsVisible: false,
+    menuFocusItem: 0,
+    vehicleIsMoving: false,
+    guidanceIsActive: false,
+    tripInfoIsVisible: false,
+    tripWindowSelection: 0,
+    mapZoomLevel: 1,
+    mediaVolume: 15,
+    currentFeedbackOverlay: null,   // { kind: "volume" | "settingsHidden", text }
+    overlayStack: [],               // prompt ids, bottom to top; the last one is active
+    pendingFeedback: [],            // feedback overlays waiting for a prompt to close or the current one to finish
+    conditions: { call: false, lowTire: false, lowFuel: false, sideStand: false }
+  };
+  var timeoutId = null, feedbackTimer = null, tripTimer = null;
+
+  var el = {
+    pageName: document.getElementById("pageName"),
+    trip: document.getElementById("trip"),
+    tripLabel: document.getElementById("tripLabel"),
+    zoom: document.getElementById("zoom"),
+    menu: document.getElementById("menu"),
+    live: document.getElementById("live"),
+    dpad: document.getElementById("dpad"),
+    directions: document.getElementById("directions"),
+    tripInfo: document.getElementById("tripInfo"),
+    fbVolume: document.getElementById("fbVolume"),
+    fbPill: document.getElementById("fbPill"),
+    prompt: document.getElementById("prompt"),
+    promptTitle: document.getElementById("promptTitle"),
+    promptSub: document.getElementById("promptSub"),
+    promptHints: document.getElementById("promptHints"),
+    devMoving: document.getElementById("devMoving"),
+    devGuidance: document.getElementById("devGuidance"),
+    queueList: document.getElementById("queueList")
+  };
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function polar(cx, r, deg) {
+    var a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cx + r * Math.sin(a)];
+  }
+
+  /* ---------- D-pad drawing ---------- */
+  function wedgePath(center) {
+    var R = 96, r = 56, half = 41;
+    var o1 = polar(100, R, center - half), o2 = polar(100, R, center + half);
+    var i2 = polar(100, r, center + half), i1 = polar(100, r, center - half);
+    return "M" + o1 + " A" + R + " " + R + " 0 0 1 " + o2 + " L" + i2 + " A" + r + " " + r + " 0 0 0 " + i1 + " Z";
+  }
+  var DPAD = [
+    { input: "UpButton", label: "Up", angle: -90 },
+    { input: "RightButton", label: "Right", angle: 0 },
+    { input: "DownButton", label: "Down", angle: 90 },
+    { input: "LeftButton", label: "Left", angle: 180 }
+  ];
+  var dpadIcons = {};
+  var segByInput = {};
+  DPAD.forEach(function (d) {
+    var g = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": d.label, "data-input": d.input });
+    g.appendChild(svg("path", { d: wedgePath(d.angle) }));
+    var p = polar(100, 76, d.angle);
+    var icon = svg("polygon", { "class": "icon", points: "0,-8 9,6 -9,6", transform: "translate(" + p[0] + " " + p[1] + ") rotate(" + (d.angle + 90) + ")" });
+    g.appendChild(icon);
+    el.dpad.appendChild(g);
+    dpadIcons[d.input] = icon;
+    segByInput[d.input] = g;
+  });
+  var cg = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": "Center", "data-input": "CenterButton" });
+  cg.appendChild(svg("rect", { x: 66, y: 66, width: 68, height: 68, rx: 18 }));
+  var cIcon = svg("circle", { "class": "icon center", cx: 100, cy: 100, r: 9 });
+  cg.appendChild(cIcon);
+  el.dpad.appendChild(cg);
+  dpadIcons.CenterButton = cIcon;
+  segByInput.CenterButton = cg;
+
+  /* ---------- Helpers ---------- */
+  function isMedia(input) { return input === "VolumeUpButton" || input === "VolumeDownButton"; }
+  function topPromptId() {
+    var s = state.overlayStack;
+    return s.length ? s[s.length - 1] : null;
+  }
+  function stepIndex(from, dir) {
+    // Settings stays in the menu while moving.
+    return (from + dir + SECTIONS.length) % SECTIONS.length;
+  }
+  // The "Settings are hidden" pill is a safety layer that belongs to the Settings page itself. It stays up
+  // while the vehicle is moving and the menu is closed, never over the menu. It is state-bound, not timed.
+  function lockNoticeApplies() {
+    return state.vehicleIsMoving && state.currentSection === SETTINGS && !state.menuIsVisible;
+  }
+  // currentSection and menuFocusItem change together, always.
+  function setSection(i) {
+    state.currentSection = i;
+    state.menuFocusItem = i;
+    state.isTopLevel = true;
+  }
+  function restartTimeout() {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(function () {
+      if (state.menuIsVisible) { dismissMenu(); render(); }
+    }, MENU_TIMEOUT_MS);
+  }
+  function openMenu() { state.menuIsVisible = true; restartTimeout(); }
+  function dismissMenu() { state.menuIsVisible = false; clearTimeout(timeoutId); }
+
+  // Notification priority (highest first): 1 interactive prompts, 2 media feedback, 3 main menu, 4 user/system.
+  // MediaFeedbackOverlay keeps one nullable reference (currentFeedbackOverlay). Anything that cannot show yet
+  // waits in pendingFeedback and is shown in arrival order once the higher tier clears.
+  function clearFeedback() { state.currentFeedbackOverlay = null; clearTimeout(feedbackTimer); }
+  function dropPending(kind) {
+    state.pendingFeedback = state.pendingFeedback.filter(function (f) { return f.kind !== kind; });
+  }
+  function presentFeedback(fb) {
+    state.currentFeedbackOverlay = fb;
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(function () {
+      state.currentFeedbackOverlay = null;
+      pumpFeedback();
+      render();
+    }, FEEDBACK_TIMEOUT_MS);
+  }
+  function pumpFeedback() {
+    if (state.overlayStack.length || state.currentFeedbackOverlay) return;
+    var next = state.pendingFeedback.shift();
+    if (next) presentFeedback(next);
+  }
+  function showFeedback(kind, text) {
+    var fb = { kind: kind, text: text };
+    var cur = state.currentFeedbackOverlay;
+    dropPending(kind);
+    // A prompt is open, or a different feedback is on screen: wait in line.
+    if (state.overlayStack.length || (cur && cur.kind !== kind)) { state.pendingFeedback.push(fb); return; }
+    // Same kind (for example another volume press) replaces the current one and restarts its timeout.
+    presentFeedback(fb);
+  }
+
+  // PromptOverlay stack: higher priority sits above lower priority; an equal-priority newcomer queues below.
+  function openPrompt(id) {
+    if (state.overlayStack.indexOf(id) !== -1) return;
+    var p = PROMPTS[id].priority, s = state.overlayStack, at = s.length;
+    for (var i = 0; i < s.length; i++) {
+      if (PROMPTS[s[i]].priority >= p) { at = i; break; }
+    }
+    s.splice(at, 0, id);
+    dismissMenu();
+    // A prompt outranks feedback: the feedback on screen goes back to the front of the line.
+    var cur = state.currentFeedbackOverlay;
+    if (cur) { dropPending(cur.kind); state.pendingFeedback.unshift(cur); clearFeedback(); }
+  }
+  function removePrompt(id) {
+    var i = state.overlayStack.indexOf(id);
+    if (i !== -1) state.overlayStack.splice(i, 1);
+    pumpFeedback();
+  }
+
+  function showTripInfo() {
+    state.tripInfoIsVisible = true;
+    clearTimeout(tripTimer);
+    tripTimer = setTimeout(function () { state.tripInfoIsVisible = false; render(); }, TRIPINFO_TIMEOUT_MS);
+  }
+  function hideTripInfo() { state.tripInfoIsVisible = false; clearTimeout(tripTimer); }
+  function endGuidance() {
+    state.guidanceIsActive = false;
+    hideTripInfo();
+  }
+
+  /* ---------- Step 1: Button Guard Table ---------- */
+  function suppressed(input) {
+    var top = topPromptId();
+    if (isMedia(input)) {
+      if (top === "call") return true;
+      if (input === "VolumeUpButton" && state.mediaVolume >= MAX_VOLUME) return true;
+      if (input === "VolumeDownButton" && state.mediaVolume <= 0) return true;
+      return false;
+    }
+    if (top) {
+      if (PROMPTS[top].alert) return !(input === "CenterButton" || input === "LeftButton");
+      return !(input === "CenterButton" || input === "DownButton");
+    }
+    if (state.menuIsVisible) return input === "TripButton" || input === "UpButton" || input === "DownButton";
+    if (state.currentSection === MAP) {
+      if (input === "UpButton" && state.mapZoomLevel >= MAX_ZOOM) return true;
+      if (input === "DownButton" && state.mapZoomLevel <= MIN_ZOOM) return true;
+      if ((input === "LeftButton" || input === "CenterButton") && !state.guidanceIsActive) return true;
+    }
+    return input === "TripButton" && state.currentSection !== 0;
+  }
+
+  /* ---------- Steps 2 and 3: routing (context x input) ---------- */
+  function route(input) {
+    if (input === "VolumeUpButton") return "volumeUp";
+    if (input === "VolumeDownButton") return "volumeDown";
+    var top = topPromptId();
+    if (top) {
+      if (PROMPTS[top].alert) return (input === "CenterButton" || input === "LeftButton") ? "dismissAlert" : null;
+      if (input === "CenterButton") return "acceptCall";
+      if (input === "DownButton") return "declineCall";
+      return null;
+    }
+    if (state.menuIsVisible) {
+      switch (input) {
+        case "PageButton": case "RightButton": return "menuNext";
+        case "LeftButton": return "menuPrev";
+        case "CenterButton": return "menuDismiss";
+        case "HomeButton": return "homeAndDismiss";
+      }
+      return null;
+    }
+    var onHome = state.currentSection === 0;
+    var onMap = state.currentSection === MAP;
+    switch (input) {
+      case "PageButton": return "openMenuNext";
+      case "HomeButton": return onHome ? null : "goHome";
+      case "TripButton": return onHome ? "tripNext" : null;
+      case "UpButton": return onMap ? "zoomIn" : null;
+      case "DownButton": return onHome ? "tripNext" : onMap ? "zoomOut" : null;
+      case "LeftButton": return onMap ? "cancelRoute" : null;
+      case "CenterButton": return onMap ? "toggleTripInfo" : null;
+    }
+    return null;
+  }
+
+  /* ---------- Step 4: execute ---------- */
+  function execute(action) {
+    switch (action) {
+      case "openMenuNext": setSection(stepIndex(state.currentSection, 1)); openMenu(); break;
+      case "menuNext": setSection(stepIndex(state.currentSection, 1)); restartTimeout(); break;
+      case "menuPrev": setSection(stepIndex(state.currentSection, -1)); restartTimeout(); break;
+      case "menuDismiss": dismissMenu(); break;
+      case "homeAndDismiss": setSection(0); dismissMenu(); break;
+      case "goHome": setSection(0); break;
+      case "tripNext": state.tripWindowSelection = (state.tripWindowSelection + 1) % TRIP_WINDOW.length; break;
+      case "zoomIn": state.mapZoomLevel += 1; break;
+      case "zoomOut": state.mapZoomLevel -= 1; break;
+      case "cancelRoute": endGuidance(); break;
+      case "toggleTripInfo": if (state.tripInfoIsVisible) hideTripInfo(); else showTripInfo(); break;
+      case "volumeUp": state.mediaVolume += 1; showFeedback("volume", "Volume increase"); break;
+      case "volumeDown": state.mediaVolume -= 1; showFeedback("volume", "Volume decrease"); break;
+      case "acceptCall": case "declineCall":
+        state.conditions.call = false; removePrompt("call"); break;
+      case "dismissAlert":
+        // Dismisses the alert only. The condition stays active.
+        removePrompt(topPromptId()); break;
+    }
+  }
+
+  function handle(input) {
+    if (!suppressed(input)) {
+      var action = route(input);
+      if (action) execute(action);
+    }
+    render();
+  }
+
+  /* ---------- Developer controls (system events) ---------- */
+  function toggleCondition(id) {
+    if (state.conditions[id]) {
+      state.conditions[id] = false;
+      removePrompt(id);
+    } else {
+      state.conditions[id] = true;
+      openPrompt(id);
+    }
+  }
+  function setMoving(on) {
+    // Settings stays reachable while moving, so the rider is not sent Home; the page shows the pill instead.
+    state.vehicleIsMoving = on;
+  }
+  function setGuidance(on) {
+    if (on) state.guidanceIsActive = true; else endGuidance();
+  }
+  function dev(action) {
+    switch (action) {
+      case "call": case "lowTire": case "lowFuel": case "sideStand": toggleCondition(action); break;
+      case "hangup":
+        if (state.conditions.call) { state.conditions.call = false; removePrompt("call"); }
+        break;
+      case "directions":
+        // The guidance banner stays up for as long as guidance is active, on the Navigation page only.
+        if (state.guidanceIsActive) endGuidance();
+        else { state.guidanceIsActive = true; setSection(MAP); dismissMenu(); }
+        break;
+      case "tripInfo":
+        if (state.tripInfoIsVisible) hideTripInfo();
+        else { state.guidanceIsActive = true; setSection(MAP); dismissMenu(); showTripInfo(); }
+        break;
+      case "volumeBurst": showFeedback("volume", "Volume"); break;
+      case "settingsHidden":
+        state.vehicleIsMoving = true;
+        setSection(SETTINGS);
+        dismissMenu();
+        break;
+      case "clear":
+        state.overlayStack = [];
+        state.pendingFeedback = [];
+        state.conditions = { call: false, lowTire: false, lowFuel: false, sideStand: false };
+        clearFeedback(); state.menuIsVisible = false; clearTimeout(timeoutId); endGuidance();
+        break;
+    }
+    render();
+  }
+
+  /* ---------- Rendering ---------- */
+  function render() {
+    var cur = SECTIONS[state.currentSection];
+    var trip = TRIP_WINDOW[state.tripWindowSelection];
+    var topId = topPromptId();
+    var fb = state.currentFeedbackOverlay;
+    var showTrip = state.currentSection === 0 && !state.menuIsVisible;
+    // Settings pill: only on the locked Settings page, and only when nothing outranks it
+    // (a prompt, or the full-screen volume overlay). While it shows, the page shows nothing else.
+    var lockApplies = lockNoticeApplies();
+    var pillShown = lockApplies && !topId && !(fb && fb.kind === "volume");
+    var onMap = state.currentSection === MAP;
+    el.pageName.textContent = cur.label;
+    el.pageName.hidden = pillShown;
+    el.tripLabel.textContent = trip.label;
+    el.trip.hidden = !showTrip;
+    var showZoom = state.currentSection === MAP && !state.menuIsVisible;
+    el.zoom.textContent = ZOOM_TEXT[state.mapZoomLevel];
+    el.zoom.hidden = !showZoom;
+    el.menu.hidden = !state.menuIsVisible;
+
+    // Guidance and trip information belong to the Navigation page only.
+    el.directions.hidden = !(state.guidanceIsActive && onMap);
+    el.tripInfo.hidden = !(state.tripInfoIsVisible && state.guidanceIsActive && onMap);
+    el.fbVolume.hidden = !(fb && fb.kind === "volume");
+    el.fbPill.hidden = !pillShown;
+    if (fb && fb.kind === "volume") el.fbVolume.textContent = fb.text;
+
+    el.prompt.hidden = !topId;
+    var promptText = "";
+    if (topId) {
+      var p = PROMPTS[topId], waiting = state.overlayStack.length - 1;
+      el.promptTitle.textContent = p.title;
+      el.promptSub.textContent = p.sub + (waiting > 0 ? " (" + waiting + " more waiting)" : "");
+      el.promptHints.textContent = "";
+      p.hints.forEach(function (h) {
+        var s = document.createElement("span");
+        s.textContent = h;
+        el.promptHints.appendChild(s);
+      });
+      promptText = ", " + p.title;
+    }
+
+    Object.keys(dpadIcons).forEach(function (input) {
+      var active = !suppressed(input) && route(input) !== null;
+      if (active) dpadIcons[input].removeAttribute("hidden");
+      else dpadIcons[input].setAttribute("hidden", "");
+    });
+
+    // Notification queue readout: highest tier first, newest-to-show first within a tier.
+    el.queueList.textContent = "";
+    var rows = [];
+    for (var qi = state.overlayStack.length - 1; qi >= 0; qi--) {
+      rows.push({ tier: 1, name: PROMPTS[state.overlayStack[qi]].title, status: qi === state.overlayStack.length - 1 ? "Showing" : "Waiting" });
+    }
+    if (fb) rows.push({ tier: 2, name: fb.text, status: "Showing" });
+    state.pendingFeedback.forEach(function (f) { rows.push({ tier: 2, name: f.text, status: "Waiting" }); });
+    if (lockApplies) rows.push({ tier: 2, name: "Settings are hidden while riding", status: pillShown ? "Showing" : "Waiting" });
+    if (!rows.length) {
+      var empty = document.createElement("li");
+      empty.className = "q-empty";
+      empty.textContent = "Nothing queued";
+      el.queueList.appendChild(empty);
+    }
+    rows.forEach(function (r) {
+      var li = document.createElement("li");
+      li.className = "q-row" + (r.status === "Showing" ? " now" : "");
+      var tier = document.createElement("span"); tier.className = "q-tier"; tier.textContent = "T" + r.tier;
+      var nm = document.createElement("span"); nm.className = "q-name"; nm.textContent = r.name;
+      var st = document.createElement("span"); st.className = "q-status"; st.textContent = r.status;
+      li.appendChild(tier); li.appendChild(nm); li.appendChild(st);
+      el.queueList.appendChild(li);
+    });
+
+    // Developer panel state
+    el.devMoving.checked = state.vehicleIsMoving;
+    el.devGuidance.checked = state.guidanceIsActive;
+    document.querySelectorAll("[data-dev]").forEach(function (b) {
+      var k = b.getAttribute("data-dev"), on = null;
+      if (state.conditions.hasOwnProperty(k)) on = state.conditions[k];
+      else if (k === "directions") on = state.guidanceIsActive;
+      else if (k === "tripInfo") on = state.tripInfoIsVisible && state.guidanceIsActive;
+      if (on !== null) b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+
+    el.live.textContent = cur.label + (showTrip ? ", " + trip.label : "") + (showZoom ? ", " + el.zoom.textContent : "") +
+      (state.menuIsVisible ? ", main menu open" : "") + promptText + (fb ? ", " + fb.text : "");
+  }
+
+  /* ---------- Wiring ---------- */
+  function flash(node) {
+    node.classList.add("pressed");
+    setTimeout(function () { node.classList.remove("pressed"); }, 110);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (node) {
+    node.addEventListener("click", function () { handle(node.getAttribute("data-input")); });
+    if (node.tagName.toLowerCase() === "g") {
+      node.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); flash(node); handle(node.getAttribute("data-input")); }
+      });
+    }
+  });
+  document.querySelectorAll("[data-dev]").forEach(function (node) {
+    node.addEventListener("click", function () { dev(node.getAttribute("data-dev")); });
+  });
+  el.devMoving.addEventListener("change", function () { setMoving(el.devMoving.checked); render(); });
+  el.devGuidance.addEventListener("change", function () { setGuidance(el.devGuidance.checked); render(); });
+
+  var KEYMAP = {
+    ArrowUp: "UpButton", ArrowDown: "DownButton", ArrowLeft: "LeftButton", ArrowRight: "RightButton",
+    Enter: "CenterButton", p: "PageButton", t: "TripButton", h: "HomeButton",
+    "+": "VolumeUpButton", "=": "VolumeUpButton", "-": "VolumeDownButton"
+  };
+  document.addEventListener("keydown", function (e) {
+    if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+    var input = KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!input) return;
+    e.preventDefault();
+    var node = segByInput[input] || document.querySelector('.key[data-input="' + input + '"]');
+    if (node) flash(node);
+    handle(input);
+  });
+
+  render();
+})();
+</script>
+
+</body></html>
