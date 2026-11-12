@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Sportser_S_Prototype03.07</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&display=swap">
+<style>
+  /* Layout: round 4" display on the left; physical controls and developer panel on the right.
+     Layer stack inside the display, bottom to top: page (1) > guidance banners (2) > MainMenuOverlay (3)
+     > MediaFeedbackOverlay (4) > PromptOverlay (5). Wireframe greys, flat blocks, no decoration. */
+  :root {
+    --bg: #FFFFFF;
+    --display: #D9D9D9;
+    --display-edge: #C9C9C9;
+    --key: #D9D9D9;
+    --key-hover: #CBCBCB;
+    --key-press: #BBBBBB;
+    --ink: #0B0B0B;
+    --ink-soft: #5A5A5A;
+    --accent: #E8641F;
+    --ring: #A5A5A5;
+    --panel: #F3F3F3;
+    --line: #D0D0D0;
+    --font-body: "Barlow", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+      --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D; --panel: #3A3E45; --line: #3B3F46;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111215; --display: #2B2E33; --display-edge: #3B3F46; --key: #2A2D32; --key-hover: #353940;
+    --key-press: #41464E; --ink: #ECEDEF; --ink-soft: #9AA0AA; --ring: #50555D; --panel: #3A3E45; --line: #3B3F46;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    padding-block: 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .stage {
+    max-width: 980px; margin: 0 auto; min-height: 70vh;
+    display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: center;
+  }
+  @media (max-width: 720px) { .stage { grid-template-columns: minmax(0, 1fr); min-height: 0; } }
+
+  /* ---------- Dashboard display ----------
+     Frame artwork is 613 x 496 units. Layers, bottom to top: Display (light grey base) > .content (all UI layers,
+     clipped to the Display shape) > Union bezel (with the screen opening) > Protected area (dark strip).
+     .content covers the whole frame. --u is one artwork unit, so every size below is written in artwork units
+     and positions use frame coordinates. The circle centre of the opening is at (306.5, 307); content is centred
+     on y = 270 (the middle of the opening below the top notch).
+     Text fields: every text sits in a fixed-size box (.fld) whose width, height and font size come from the SLOTS
+     table in the script, so the box never changes with the content. */
+  .screen {
+    position: relative;
+    width: min(100%, 540px);
+    aspect-ratio: 613 / 496;
+    margin-inline: auto;
+    overflow: hidden;
+    user-select: none;
+    /* The dashboard keeps its wireframe greys in both themes. */
+    --ink: #0B0B0B; --ink-soft: #4F4F4F; --panel: #F3F3F3;
+    color: var(--ink);
+  }
+  .frame { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .frame.base { z-index: 0; }
+  .frame.top { z-index: 2; }
+  .content {
+    container-type: inline-size;
+    --u: .163132cqw;
+    position: absolute; inset: 0; z-index: 1;
+    clip-path: url(#displayClip);   /* the Display (semicircle) shape masks every overlay */
+  }
+
+  /* Fixed-size text box. One line, never wraps, anything wider than the box would be cut off (and is reported by hmiCheck). */
+  .fld {
+    display: block; margin: 0; box-sizing: border-box; white-space: nowrap; overflow: hidden;
+    width: calc(var(--u) * var(--w, 100)); height: calc(var(--u) * var(--h, 30));
+    line-height: calc(var(--u) * var(--h, 30)); font-size: calc(var(--u) * var(--fs, 20));
+    font-weight: var(--fw, 500); text-align: var(--ta, center);
+  }
+  .fld.num { font-variant-numeric: tabular-nums; }
+  .fld.caps { text-transform: uppercase; letter-spacing: .06em; }
+  .fld.soft { color: var(--ink-soft); }
+  .fld.chip { border: calc(var(--u) * 2) solid currentColor; line-height: calc(var(--u) * (var(--h, 30) - 4)); }
+
+  .page {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: calc(var(--u) * 14);
+    padding-top: calc(var(--u) * 44);   /* centres the page content on y = 270 */
+  }
+  .page.guided { padding-top: calc(var(--u) * 188); }  /* directions and turns bands are up: content sits below them, centred on y = 342 */
+  .trip {
+    display: grid; justify-items: center; gap: calc(var(--u) * 4);
+    padding: calc(var(--u) * 10) calc(var(--u) * 18); border: calc(var(--u) * 2) solid var(--ink);
+  }
+  .vlist { display: grid; gap: calc(var(--u) * 8); }
+  .vrow { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 20); }
+
+  /* ---------- Overlay blocks (shared) ---------- */
+  .ov { position: absolute; background: var(--panel); color: var(--ink); border: 0 solid var(--ink); text-align: center; }
+  /* Shaped overlays: the artwork is an SVG drawn in frame space; text sits in boxes laid over it. */
+  .ov.shape { inset: 0; background: none; border: 0; pointer-events: none; }
+  .shape-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* Directions (artwork directions_overlay.svg, y 108..222) and turns (turns_overlay.svg, y 222..271):
+     two bands at the top of the opening. Non-interactive. Greys darkened so they read against the display. */
+  .directions { z-index: 2; }
+  .turns { z-index: 2; }
+  .dir-row {
+    position: absolute; left: 50%; top: calc(var(--u) * 150); transform: translateX(-50%); height: calc(var(--u) * 70);
+    display: flex; align-items: center; gap: calc(var(--u) * 18);
+  }
+  .dir-arrow { width: calc(var(--u) * 50); height: calc(var(--u) * 50); flex: none; }
+  .dir-arrow path { fill: none; stroke: var(--ink); stroke-width: 7; stroke-linecap: square; stroke-linejoin: miter; }
+  .dir-text { display: grid; gap: calc(var(--u) * 2); }
+  .turns-row {
+    position: absolute; left: 50%; top: calc(var(--u) * 229); transform: translateX(-50%); height: calc(var(--u) * 34);
+    display: flex; align-items: center; gap: calc(var(--u) * 14);
+  }
+
+  /* Trip information: block about one fifth of the display height, y 290..399. */
+  .tripinfo {
+    z-index: 2; left: 50%; transform: translateX(-50%); top: calc(var(--u) * 290); width: calc(var(--u) * 440); height: calc(var(--u) * 109);
+    border-width: calc(var(--u) * 2);
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
+  }
+  .ti-cell { display: grid; gap: calc(var(--u) * 3); justify-items: center; }
+
+  /* MainMenuOverlay (menu_buttons_overlay.svg + menu_overlay_progress.svg): a scrim over the page, the five page
+     buttons centred on the circle centre with the selected one in the middle, and the progress dots below.
+     Neighbouring buttons slide in and are cut off by the Display mask. */
+  .menu { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .mbtn { transition: transform .26s ease, opacity .26s ease; opacity: .5; }
+  .mbtn.sel { opacity: 1; }
+  .mdot { fill: none; stroke: #F2F2F2; stroke-width: 3; transition: fill .2s ease; }
+  .mdot.sel { fill: #F2F2F2; }
+
+  /* MediaFeedbackOverlay variants: volume fills the display; the settings notice is a pill. */
+  .volume { z-index: 4; inset: 0; display: grid; place-items: center; padding-top: calc(var(--u) * 44); }
+  .pill {
+    z-index: 4; left: 50%; top: calc(var(--u) * 288); transform: translate(-50%, -50%);
+    padding: calc(var(--u) * 16) calc(var(--u) * 30); border-width: calc(var(--u) * 3); border-radius: 999px;
+  }
+
+  /* PromptOverlay (interactive_prompt_overlay.svg): dark pill centred on the display (y 163..387). Captures the D-pad. */
+  .prompt { z-index: 5; color: #F4F4F4; }
+  .prompt .soft { color: #D0D0D0; }
+  .prompt-body {
+    position: absolute; left: 50%; top: calc(var(--u) * 275); transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 6);
+  }
+  .hints { display: flex; justify-content: center; gap: calc(var(--u) * 14); }
+
+  /* ---------- Physical controls ---------- */
+  .controls { display: grid; justify-items: center; gap: 28px; }
+  .dpad { width: min(100%, 230px); height: auto; display: block; }
+  .dpad .seg { cursor: pointer; outline: none; }
+  .dpad .seg path, .dpad .seg rect { fill: var(--key); stroke: var(--key); stroke-width: 6; stroke-linejoin: round; }
+  .dpad .seg:hover path, .dpad .seg:hover rect { fill: var(--key-hover); stroke: var(--key-hover); }
+  .dpad .seg:active path, .dpad .seg:active rect, .dpad .seg.pressed path, .dpad .seg.pressed rect { fill: var(--key-press); stroke: var(--key-press); }
+  .dpad .seg:focus-visible path, .dpad .seg:focus-visible rect { stroke: var(--accent); }
+  .dpad .icon { fill: var(--ink-soft); pointer-events: none; }
+  .dpad .icon.center { fill: none; stroke: var(--ink-soft); stroke-width: 3; }
+  .dpad .icon[hidden] { display: none; }
+
+  .keys { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .key {
+    width: 78px; height: 78px; border: 0; border-radius: 16px; background: var(--key); color: var(--ink);
+    font: 500 1rem var(--font-body); cursor: pointer;
+  }
+  .key:hover { background: var(--key-hover); }
+  .key:active, .key.pressed { background: var(--key-press); }
+  .key:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Developer panel ---------- */
+  .dev { width: min(100%, 420px); display: grid; gap: 14px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .dev-title { margin: 0; font-size: .8rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+  .dev-group { display: grid; gap: 8px; }
+  .dev-label { margin: 0; font-size: .85rem; font-weight: 600; }
+  .dev-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dev-btn {
+    min-height: 40px; padding: 8px 14px; border: 1px solid var(--ink-soft); border-radius: 8px; background: transparent; color: var(--ink);
+    font: 500 .95rem var(--font-body); cursor: pointer;
+  }
+  .dev-btn:hover { background: var(--key-hover); }
+  .dev-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .dev-btn:focus-visible, .sw input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .sw { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; font-size: .95rem; cursor: pointer; }
+  .sw input { width: 20px; height: 20px; accent-color: var(--ink); }
+  .queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .q-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: .95rem; }
+  .q-row.now { border-color: var(--ink); }
+  .q-tier { font-weight: 600; font-size: .8rem; letter-spacing: .06em; color: var(--ink-soft); }
+  .q-status { font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+  .q-row.now .q-status { color: var(--ink); }
+  .q-empty { font-size: .95rem; color: var(--ink-soft); }
+  .dev-note { margin: 0; font-size: .8rem; line-height: 1.4; color: var(--ink-soft); }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- Display (semicircle) shape as a mask for every overlay, scaled to the 613 x 496 frame -->
+    <clipPath id="displayClip" clipPathUnits="objectBoundingBox">
+      <path transform="scale(0.001631321 0.002016129) translate(0 1)" d="M306.5 0C475.775 0 613 137.225 613 306.5C613 373.378 591.58 435.252 555.227 485.638C550.903 491.63 543.878 495 536.489 495H76.5109C69.1216 495 62.0967 491.63 57.7733 485.638C21.4203 435.252 0 373.378 0 306.5C0 137.225 137.225 0 306.5 0Z"/>
+    </clipPath>
+  </defs>
+</svg>
+
+<main class="stage">
+  <div class="screen" id="screen">
+    <!-- Display (system zone): light grey base, offset 1 unit down -->
+    <svg class="frame base" viewBox="0 0 613 496" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g id="Display" transform="translate(0 1)">
+        <path d="M306.5 0C475.775 0 613 137.225 613 306.5C613 373.378 591.58 435.252 555.227 485.638C550.903 491.63 543.878 495 536.489 495H76.5109C69.1216 495 62.0967 491.63 57.7733 485.638C21.4203 435.252 0 373.378 0 306.5C0 137.225 137.225 0 306.5 0Z" fill="#D9D9D9"/>
+      </g>
+    </svg>
+
+    <div class="content" id="content">
+    <div class="page" id="page">
+      <h1 class="fld" id="pageName">Home</h1>
+      <div class="trip" id="trip" aria-hidden="true">
+        <span class="fld" id="tripLabel"></span>
+        <span class="fld num" id="tripValue"></span>
+      </div>
+      <div class="vlist" id="vlist" hidden>
+        <div class="vrow"><span class="fld" id="vLabel0"></span><span class="fld num" id="vVal0"></span></div>
+        <div class="vrow"><span class="fld" id="vLabel1"></span><span class="fld num" id="vVal1"></span></div>
+        <div class="vrow"><span class="fld" id="vLabel2"></span><span class="fld num" id="vVal2"></span></div>
+      </div>
+      <p class="fld caps soft" id="zoom" hidden>Default zoom</p>
+    </div>
+
+    <!-- Directions band (directions_overlay.svg) -->
+    <div class="ov shape directions" id="directions" hidden>
+      <svg class="shape-art" viewBox="0 0 613 496" aria-hidden="true">
+        <path transform="translate(0 1)" d="M489.209 107.788C524.755 138.045 552.416 177.287 568.684 222H57.3154C73.5772 177.302 101.225 138.073 136.752 107.82L160.366 137.042C162.644 139.861 166.075 141.5 169.699 141.5H456.237C459.862 141.5 463.292 139.861 465.57 137.042L489.209 107.788Z" fill="#C2C2C2"/>
+      </svg>
+      <div class="dir-row">
+        <svg class="dir-arrow" viewBox="0 0 100 100" aria-hidden="true"><path d="M22 92 V52 H72 M52 30 L76 52 L52 74"/></svg>
+        <div class="dir-text">
+          <span class="fld num" id="dirDist"></span>
+          <span class="fld" id="dirStreet"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Turns band (turns_overlay.svg): the next manoeuvre after the current one -->
+    <div class="ov shape turns" id="turns" hidden>
+      <svg class="shape-art" viewBox="0 0 613 496" aria-hidden="true">
+        <path transform="translate(0 1)" d="M568.684 222C574.399 237.709 578.709 254.093 581.459 271H44.542C47.292 254.093 51.6003 237.709 57.3154 222H568.684Z" fill="#969696"/>
+      </svg>
+      <div class="turns-row"><span class="fld" id="turnsText"></span><span class="fld num" id="turnsDist"></span></div>
+    </div>
+
+    <div class="ov tripinfo" id="tripInfo" hidden>
+      <div class="ti-cell"><span class="fld num" id="tiTimeVal"></span><span class="fld caps soft" id="tiTimeLab"></span></div>
+      <div class="ti-cell"><span class="fld num" id="tiArrVal"></span><span class="fld caps soft" id="tiArrLab"></span></div>
+      <div class="ti-cell"><span class="fld num" id="tiDistVal"></span><span class="fld caps soft" id="tiDistLab"></span></div>
+    </div>
+
+    <!-- MainMenuOverlay: scrim + page buttons (menu_buttons_overlay.svg) + progress dots (menu_overlay_progress.svg) -->
+    <div class="menu" id="menu" aria-hidden="true" hidden>
+      <svg class="shape-art" viewBox="0 0 613 496" aria-hidden="true">
+        <rect width="613" height="496" fill="#7E7E7E" fill-opacity=".86"/>
+        <g class="mbtn" data-cx="98">
+          <circle cx="98" cy="98" r="94" fill="#fff" stroke="#000" stroke-width="8"/>
+          <path fill="#171313" d="M62.5625 94.4688C60.5625 94.4688 59.3438 93.0938 59.3438 91.4688C59.3438 90.5938 59.75 89.6875 60.5625 89L93.125 61.6562C94.5 60.5312 96 59.9688 97.5 59.9688C99 59.9688 100.5 60.5312 101.875 61.6562L117.312 74.6562V69.0938C117.312 67.7188 118.25 66.8125 119.656 66.8125H123.875C125.25 66.8125 126.156 67.7188 126.156 69.0938V82.0625L134.438 89C135.25 89.6875 135.656 90.5938 135.656 91.4688C135.656 93.0938 134.438 94.4688 132.469 94.4688C131.5 94.4688 130.625 93.9688 129.875 93.3125L98.8438 67.2812C98.4062 66.9062 97.9375 66.75 97.5 66.75C97.0625 66.75 96.5938 66.9062 96.1875 67.2812L65.125 93.3125C64.375 93.9688 63.5312 94.4688 62.5625 94.4688ZM69.4688 119.719V95.8125L95.5625 73.9375C96.75 72.9375 98.2188 72.9062 99.4062 73.9375L125.531 95.8125V119.719C125.531 124.219 122.719 126.906 118.094 126.906H76.875C72.2812 126.906 69.4688 124.219 69.4688 119.719ZM89.0312 120.906H105.969V102.875C105.969 101.406 105.031 100.469 103.562 100.469H91.4688C90 100.469 89.0312 101.406 89.0312 102.875V120.906Z"/>
+        </g>
+        <g class="mbtn" data-cx="338">
+          <circle cx="338" cy="98" r="94" fill="#fff" stroke="#000" stroke-width="8"/>
+          <path fill="#171313" d="M337 61.3569C351.803 61.3569 361.649 70.9946 361.649 85.4165C361.649 92.3848 358.875 99.561 356.449 104.796C352.774 112.978 346.707 121.853 341.438 129.93C340.224 131.802 338.699 132.738 337 132.738C335.336 132.738 333.811 131.802 332.597 129.93C327.362 121.922 321.365 113.151 317.69 105.073C315.194 99.6997 312.386 92.4541 312.386 85.4165C312.386 70.9946 322.231 61.3569 337 61.3569Z"/>
+          <circle cx="337" cy="85" r="15.5" fill="#fff" stroke="#000"/>
+        </g>
+        <g class="mbtn" data-cx="578">
+          <circle cx="578" cy="98" r="94" fill="#fff" stroke="#000" stroke-width="8"/>
+          <path fill="#171313" d="M601.569 60.5313C599.143 61.0513 597.825 62.3687 597.825 64.5181L597.895 102.93C598.033 104.456 597.305 105.426 595.988 105.704L590.441 106.848C583.299 108.338 579.867 112.013 579.867 117.525C579.867 123.072 584.097 126.955 590.129 126.955C595.814 126.955 603.268 122.691 603.268 112.776V81.02C603.268 78.567 603.648 60.0859 601.569 60.5313Z"/>
+          <path fill="#171313" d="M600.949 78.2998C602.266 78.0225 603.133 76.9824 603.133 75.6651V62.6646C603.133 60.5845 601.434 59.2324 599.423 59.6484L567.569 67.5313C565.143 68.0513 563.825 69.3687 563.825 71.5181L563.895 109.93C564.033 111.456 563.305 112.426 561.988 112.704L556.441 113.848C549.299 115.338 545.867 119.013 545.867 124.525C545.867 130.072 550.097 133.955 556.129 133.955C561.814 133.955 569.268 129.691 569.268 119.776V88.02C569.268 86.356 569.476 86.1133 571.001 85.8013L600.949 78.2998Z"/>
+        </g>
+        <g class="mbtn" data-cx="826">
+          <circle cx="826" cy="98" r="94" fill="#fff" stroke="#000" stroke-width="8"/>
+          <path fill="#171313" d="M860.745 129.567C851.301 129.567 843.703 121.969 843.703 112.586C843.703 106.188 847.21 100.589 852.439 97.667L842.75 71.7041C842.626 71.4272 842.503 71.3965 842.227 71.3965H834.136C832.66 71.3965 831.46 70.1968 831.46 68.6895C831.46 67.2129 832.66 66.0132 834.136 66.0132H843.365C845.272 66.0132 846.533 66.6592 847.148 68.2588L857.454 95.8521C858.53 95.6367 859.638 95.5137 860.745 95.5137C870.127 95.5137 877.726 103.173 877.726 112.586C877.726 121.969 870.127 129.567 860.745 129.567ZM861.729 88.4692C860.653 88.4077 859.607 88.0078 858.776 87.4541C855.854 85.5776 854.993 81.4556 856.992 78.5332C857.546 77.6719 858.346 76.9336 859.207 76.4722C860.284 75.8569 861.176 76.4106 861.422 77.5796L863.268 86.4697C863.483 87.6387 862.929 88.5923 861.729 88.4692ZM789.316 129.567C779.873 129.567 772.274 121.969 772.274 112.586C772.274 103.173 779.873 95.5137 789.316 95.5137C793.685 95.5137 797.653 97.1748 800.637 99.8818L811.649 91.1147C820.263 84.3164 826.354 81.7632 832.567 81.8247C841.365 81.9478 845.979 87.1772 845.979 94.6216C845.979 100.343 842.319 104.927 836.043 106.742L826.261 117.816C825.277 118.954 824.569 119.354 823 119.354H814.479C813.003 119.354 811.803 118.154 811.803 116.647C811.803 115.17 813.003 113.971 814.479 113.971H821.678C822.262 113.971 822.508 113.817 822.785 113.509L828.107 107.511C820.909 107.111 814.726 104.096 810.019 99.1436L803.959 103.973C805.436 106.496 806.297 109.449 806.297 112.586C806.297 121.969 798.699 129.567 789.316 129.567ZM793.869 88.623C792.393 88.623 791.193 87.4233 791.193 85.916C791.193 84.4702 792.423 83.2397 793.869 83.2397H808.419C809.865 83.2397 811.096 84.4702 811.096 85.916C811.096 87.4233 809.896 88.623 808.419 88.623H793.869ZM789.224 116.893C786.763 116.893 784.948 114.955 784.979 112.556C785.01 110.095 786.794 108.218 789.224 108.218C789.532 108.218 789.809 108.249 790.085 108.28L796.422 103.235C794.454 101.728 791.993 100.866 789.286 100.866C782.764 100.866 777.565 106.065 777.565 112.556C777.565 119.046 782.764 124.245 789.286 124.245C795.776 124.245 800.975 119.046 800.975 112.556C800.975 110.648 800.544 108.895 799.775 107.326L793.531 112.279C793.531 112.371 793.531 112.463 793.531 112.556C793.531 114.955 791.624 116.893 789.224 116.893ZM860.684 116.893C858.223 116.893 856.408 114.955 856.438 112.525C856.438 111.633 856.685 110.833 857.115 110.156L854.347 102.712C851.117 104.804 848.994 108.403 848.994 112.556C848.994 119.046 854.193 124.245 860.714 124.245C867.205 124.245 872.404 119.046 872.404 112.556C872.404 106.034 867.205 100.866 860.714 100.866C860.253 100.866 859.792 100.866 859.361 100.928L862.16 108.464C863.852 109.049 864.99 110.648 864.99 112.556C864.99 114.955 863.083 116.893 860.684 116.893Z"/>
+        </g>
+        <g class="mbtn" data-cx="1066">
+          <circle cx="1066" cy="98" r="94" fill="#fff" stroke="#000" stroke-width="8"/>
+          <path fill="#171313" d="M1062.31 134.787C1060.23 134.787 1058.74 133.574 1058.25 131.563L1056.52 124.179C1055.31 123.763 1054.16 123.312 1053.12 122.827L1046.71 126.779C1045.01 127.854 1043 127.68 1041.58 126.259L1037.14 121.821C1035.72 120.4 1035.55 118.354 1036.66 116.621L1040.57 110.242C1040.09 109.167 1039.64 108.058 1039.29 106.983L1031.87 105.215C1029.86 104.73 1028.65 103.239 1028.65 101.194V94.9536C1028.65 92.9082 1029.86 91.4175 1031.87 90.9321L1039.22 89.1641C1039.6 87.916 1040.09 86.8066 1040.5 85.8706L1036.59 79.353C1035.51 77.585 1035.62 75.6782 1037.07 74.2222L1041.58 69.7847C1043 68.3633 1044.87 68.1553 1046.57 69.1953L1053.09 73.1821C1054.13 72.6621 1055.31 72.2114 1056.52 71.7954L1058.25 64.4111C1058.74 62.3657 1060.23 61.1523 1062.31 61.1523H1068.65C1070.7 61.1523 1072.19 62.3657 1072.68 64.3765L1074.44 71.8647C1075.69 72.2808 1076.8 72.7314 1077.81 73.2168L1084.36 69.1953C1086.06 68.1553 1087.9 68.4673 1089.35 69.7847L1093.86 74.2222C1095.31 75.6782 1095.42 77.585 1094.34 79.353L1090.43 85.8706C1090.84 86.8066 1091.33 87.916 1091.74 89.1641L1099.09 90.9321C1101.1 91.4175 1102.32 92.9082 1102.32 94.9536V101.194C1102.32 103.239 1101.1 104.73 1099.09 105.215L1091.67 106.983C1091.33 108.058 1090.84 109.167 1090.36 110.242L1094.27 116.621C1095.42 118.354 1095.21 120.4 1093.79 121.821L1089.35 126.259C1087.93 127.68 1085.95 127.854 1084.26 126.779L1077.81 122.827C1076.77 123.312 1075.62 123.763 1074.44 124.179L1072.68 131.563C1072.23 133.574 1070.7 134.787 1068.65 134.787H1062.31ZM1065.47 110.104C1072.16 110.104 1077.6 104.661 1077.6 97.9697C1077.6 91.2788 1072.16 85.8359 1065.47 85.8359C1058.77 85.8359 1053.33 91.2788 1053.33 97.9697C1053.33 104.661 1058.77 110.104 1065.47 110.104Z"/>
+        </g>
+        <g id="menuDots">
+          <circle class="mdot" cx="242.5" cy="425.5" r="12"/>
+          <circle class="mdot" cx="274.5" cy="425.5" r="12"/>
+          <circle class="mdot" cx="306.5" cy="425.5" r="12"/>
+          <circle class="mdot" cx="338.5" cy="425.5" r="12"/>
+          <circle class="mdot" cx="370.5" cy="425.5" r="12"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="ov volume" id="fbVolume" aria-hidden="true" hidden><span class="fld" id="volumeText">Volume</span></div>
+    <div class="ov pill" id="fbPill" aria-hidden="true" hidden><span class="fld" id="lockText"></span></div>
+
+    <!-- PromptOverlay (interactive_prompt_overlay.svg), centred horizontally on the display -->
+    <div class="ov shape prompt" id="prompt" role="alertdialog" aria-labelledby="promptTitle" hidden>
+      <svg class="shape-art" viewBox="0 0 613 496" aria-hidden="true">
+        <rect x="48.5" y="163" width="516" height="224" rx="112" fill="#3D3D3D"/>
+      </svg>
+      <div class="prompt-body">
+        <h2 class="fld" id="promptTitle"></h2>
+        <p class="fld soft" id="promptSub"></p>
+        <div class="hints"><span class="fld chip" id="promptHint1"></span><span class="fld chip" id="promptHint2" hidden></span></div>
+        <p class="fld" id="promptQueued" hidden></p>
+      </div>
+    </div>
+    </div>
+
+    <!-- Union (bezel with the screen opening) and Protected area sit above the content and mask it -->
+    <svg class="frame top" viewBox="0 0 613 496" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <g id="Union">
+        <path fill-rule="evenodd" d="M306.5 0C475.775 0 613 137.225 613 306.5C613 359.97 599.307 410.241 575.238 454H37.7617C13.6929 410.241 0 359.97 0 306.5C0 137.225 137.225 0 306.5 0ZM459.57 129.042C457.292 131.861 453.862 133.5 450.237 133.5H163.699C160.075 133.5 156.644 131.861 154.366 129.042L130.752 99.8203C72.1621 149.711 35 224.016 35 307C35 338.842 40.472 369.407 50.5264 397.805C51.6375 400.943 54.6292 403 57.958 403H145.846C148.203 403 150.44 404.039 151.96 405.841L182.603 442.159C184.122 443.961 186.36 445 188.717 445H424.283C426.64 445 428.878 443.961 430.397 442.159L461.04 405.841C462.56 404.039 464.797 403 467.154 403H556.042C559.371 403 562.363 400.943 563.474 397.805C573.528 369.407 579 338.842 579 307C579 223.998 541.821 149.679 483.209 99.7881L459.57 129.042Z" fill="#A6A6A6"/>
+      </g>
+      <g id="ProtectedArea" transform="translate(38 454)">
+        <path d="M537.478 0C531.442 10.9729 524.754 21.5362 517.466 31.6378C513.143 37.6302 506.118 41 498.728 41H38.7491C31.3599 41 24.335 37.6302 20.0116 31.6378C12.7234 21.5362 6.03543 10.9729 0 0H537.478Z" fill="#3B3B3B"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="controls">
+    <svg class="dpad" id="dpad" viewBox="0 0 200 200" role="group" aria-label="D-pad"></svg>
+    <div class="keys">
+      <button class="key" data-input="PageButton" type="button">page</button>
+      <button class="key" data-input="TripButton" type="button">trip</button>
+      <button class="key" data-input="HomeButton" type="button">home</button>
+    </div>
+    <div class="keys">
+      <button class="key" data-input="VolumeDownButton" type="button" aria-label="Volume down">vol &minus;</button>
+      <button class="key" data-input="VolumeUpButton" type="button" aria-label="Volume up">vol +</button>
+    </div>
+
+    <section class="dev" aria-labelledby="devTitle">
+      <h2 class="dev-title" id="devTitle">Developer controls</h2>
+      <div class="dev-group">
+        <label class="sw" for="devMoving"><input type="checkbox" id="devMoving"> vehicleIsMoving</label>
+        <label class="sw" for="devGuidance"><input type="checkbox" id="devGuidance"> guidanceIsActive</label>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Prompts (D-pad captured)</p>
+        <div class="dev-row">
+          <button class="dev-btn" type="button" data-dev="call" aria-pressed="false">Incoming call</button>
+          <button class="dev-btn" type="button" data-dev="lowTire" aria-pressed="false">Low tyre pressure</button>
+          <button class="dev-btn" type="button" data-dev="lowFuel" aria-pressed="false">Low fuel</button>
+          <button class="dev-btn" type="button" data-dev="sideStand" aria-pressed="false">Side stand down</button>
+          <button class="dev-btn" type="button" data-dev="hangup">Caller hangs up</button>
+        </div>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Other overlays</p>
+        <div class="dev-row">
+          <button class="dev-btn" type="button" data-dev="directions" aria-pressed="false">Directions</button>
+          <button class="dev-btn" type="button" data-dev="tripInfo" aria-pressed="false">Trip information</button>
+          <button class="dev-btn" type="button" data-dev="volumeBurst">Volume overlay</button>
+          <button class="dev-btn" type="button" data-dev="settingsHidden">Locked Settings</button>
+          <button class="dev-btn" type="button" data-dev="clear">Clear all</button>
+        </div>
+      </div>
+      <div class="dev-group">
+        <p class="dev-label">Notification queue</p>
+        <ol class="queue" id="queueList" aria-label="Notification queue"></ol>
+        <p class="dev-note">Priority, highest first: T1 interactive prompts (safety alerts before calls), T2 media feedback, T3 main menu, T4 user and system content. A higher tier shows first and lower ones wait in line, then appear in order when it clears. The menu and the page content are not queued: a prompt closes the menu, and the page stays underneath.</p>
+      </div>
+      <p class="dev-note">Try it: open a prompt, then press Volume overlay and Locked Settings (turns vehicleIsMoving on and opens Settings). Both wait until you answer the prompt. Directions and trip information turn guidanceIsActive on and open the Navigation page; both show on that page only. The guidance banner stays up while guidance is active, and trip information is also toggled by Center on that page. Alert prompts stay pressed while their condition is active, even after the rider dismisses them. With vehicleIsMoving on, Settings stays in the menu. The "Settings are hidden" pill stays on the Settings page while the vehicle moves and the menu is closed, never over the menu.</p>
+      <p class="dev-note">Text field test hook: in the browser console, <code>hmiSet("odometer", "longest")</code> forces the longest string of a field and brings it on screen, <code>hmiCheck("odometer")</code> reports clipping or wrapping, <code>hmiCheckAll()</code> runs every field, <code>hmiReset()</code> clears it. <code>hmiFields()</code> lists the fields with their format, range, step, no-data text and longest string.</p>
+    </section>
+  </div>
+</main>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+(function () {
+  var SECTIONS = [
+    { id: "HomePage", label: "Home" },
+    { id: "MapPage", label: "Navigation" },
+    { id: "MusicPage", label: "Media" },
+    { id: "StatusPage", label: "Vehicle" },
+    { id: "SettingsPage", label: "Settings" }
+  ];
+  // Trip window order from the Input Routing Matrix: Odometer > Temperature > Range > TripA > TripB > Odometer.
+  // Each item shows its title and its value (field = text field id, see FIELDS).
+  var TRIP_WINDOW = [
+    { id: "Odometer", label: "Odometer", field: "odometer" },
+    { id: "Temperature", label: "Temperature", field: "temperature" },
+    { id: "Range", label: "Range", field: "range" },
+    { id: "TripA", label: "Trip A", field: "tripA" },
+    { id: "TripB", label: "Trip B", field: "tripB" }
+  ];
+  // Map zoom: Up zooms in, Down zooms out. MIN_ZOOM and MAX_ZOOM are the guard limits.
+  var MAP = 1, MIN_ZOOM = 0, MAX_ZOOM = 2;
+  var ZOOM_TEXT = ["Zoomed out", "Default zoom", "Zoomed in"];
+  var SETTINGS = 4;
+  var MENU_TIMEOUT_MS = 3000;
+  var FEEDBACK_TIMEOUT_MS = 3000;
+  var TRIPINFO_TIMEOUT_MS = 5000;
+  var MAX_VOLUME = 20; // placeholder limit, to confirm
+
+  // Prompt overlays. Priority from the System Event Table: SafetyAlert (3) > IncomingCall (2).
+  // Low tire pressure is not in the specs; it is treated as a SafetyAlertOverlay (assumption to confirm).
+  var PROMPTS = {
+    call:      { priority: 2, alert: false, title: "Incoming call", sub: "Jordan Lee",
+                 hints: ["Center: Accept", "Down: Decline"] },
+    lowTire:   { priority: 3, alert: true, title: "Low tyre pressure", sub: "Front tyre pressure is low",
+                 hints: ["Center or Left: Dismiss"] },
+    lowFuel:   { priority: 3, alert: true, title: "Low fuel", sub: "Refuel soon",
+                 hints: ["Center or Left: Dismiss"] },
+    sideStand: { priority: 3, alert: true, title: "Side stand down", sub: "Raise the stand before riding",
+                 hints: ["Center or Left: Dismiss"] }
+  };
+
+  /* ---------- Text fields: number style, formats and boxes ----------
+     Number style (one per team): METRIC. Thousands separator "." , decimal separator ",", distance km, pressure bar,
+     fuel economy L/100 km, temperature degC (course defaults for metric).
+     Format notation:  0 digit always shown | # digit shown only when needed | G thousands separator, only when a digit
+     comes before it | D decimal separator | _ space | U unit label | anything else shown as typed.
+     Every field keeps the format, range, step, no-data text and longest string below; the layout boxes are in SLOTS.
+     No data and out of range both show the no-data text. */
+  var STYLE = { name: "Metric", G: ".", D: ",",
+    units: { distance: "km", pressure: "bar", fuelEconomy: "L/100 km", temperature: "°C" } };
+  var LOCK_TEXT = "Settings are hidden while riding";
+
+  // Simulated values. Arrival is written as hhmm (1653 = 16:53).
+  var SIM = { odometer: 18432, temperature: 21, range: 187, tripA: 124.7, tripB: 36.2,
+    tyreFront: 2.5, tyreRear: 2.7, fuelEconomy: 5.4, turnDist: 0.4, turnDist2: 0.9,
+    tripTime: 10, arrival: 1653, toGo: 5.1 };
+
+  // Box of every text slot, in artwork units: width, height, font size, alignment, weight.
+  var SLOTS = {
+    pageName:    { w: 332, h: 72, fs: 64, ta: "center", fw: 500 },
+    tripLabel:   { w: 176, h: 34, fs: 28, ta: "center", fw: 500 },
+    tripValue:   { w: 262, h: 52, fs: 44, ta: "right",  fw: 500 },
+    zoom:        { w: 242, h: 34, fs: 28, ta: "center", fw: 600 },
+    vLabel0:     { w: 144, h: 40, fs: 30, ta: "left",   fw: 500 },
+    vLabel1:     { w: 136, h: 40, fs: 30, ta: "left",   fw: 500 },
+    vLabel2:     { w: 206, h: 40, fs: 30, ta: "left",   fw: 500 },
+    vVal0:       { w: 108, h: 40, fs: 30, ta: "right",  fw: 600 },
+    vVal1:       { w: 108, h: 40, fs: 30, ta: "right",  fw: 600 },
+    vVal2:       { w: 218, h: 40, fs: 30, ta: "right",  fw: 600 },
+    dirDist:     { w: 92, h: 26, fs: 22, ta: "left",   fw: 600 },
+    dirStreet:   { w: 320, h: 26, fs: 22, ta: "left",   fw: 500 },
+    turnsText:   { w: 224, h: 34, fs: 22, ta: "left",   fw: 500 },
+    turnsDist:   { w: 92, h: 34, fs: 22, ta: "right",  fw: 600 },
+    tiTimeVal:   { w: 108, h: 32, fs: 26, ta: "center", fw: 600 },
+    tiArrVal:    { w: 80, h: 32, fs: 26, ta: "center", fw: 600 },
+    tiDistVal:   { w: 124, h: 32, fs: 26, ta: "center", fw: 600 },
+    tiTimeLab:   { w: 108, h: 18, fs: 15, ta: "center", fw: 500 },
+    tiArrLab:    { w: 74, h: 18, fs: 15, ta: "center", fw: 500 },
+    tiDistLab:   { w: 58, h: 18, fs: 15, ta: "center", fw: 500 },
+    volumeText:  { w: 376, h: 56, fs: 46, ta: "center", fw: 600 },
+    lockText:    { w: 396, h: 34, fs: 26, ta: "center", fw: 500 },
+    promptTitle: { w: 352, h: 46, fs: 40, ta: "center", fw: 600 },
+    promptSub:   { w: 362, h: 30, fs: 26, ta: "center", fw: 500 },
+    promptHint1: { w: 244, h: 32, fs: 20, ta: "center", fw: 600 },
+    promptHint2: { w: 164, h: 32, fs: 20, ta: "center", fw: 600 },
+    promptQueued:{ w: 106, h: 24, fs: 20, ta: "center", fw: 600 }
+  };
+
+  function promptTexts(pick) {
+    var out = [];
+    Object.keys(PROMPTS).forEach(function (k) { var t = pick(PROMPTS[k]); if (t && out.indexOf(t) < 0) out.push(t); });
+    return out;
+  }
+  var TRIP_CTX = function (i) { return { section: 0, trip: i }; };
+  var NAV = { section: MAP, guidance: true }, NAVTRIP = { section: MAP, guidance: true, tripInfo: true };
+  // kind "num": fmt, unit, min, max, step, nodata (template: D decimal, _ space, U unit). kind "text": texts.
+  // ctx says which screen state makes the field visible (used by hmiSet).
+  var FIELDS = {
+    odometer:    { kind: "num", name: "Odometer", slot: "tripValue", fmt: "###G##0_U", unit: "distance", min: 0, max: 999999, step: 1, nodata: "n/a", ctx: TRIP_CTX(0) },
+    temperature: { kind: "num", name: "Temperature", slot: "tripValue", fmt: "#0_U", unit: "temperature", min: 0, max: 60, step: 1, nodata: "--_U", ctx: TRIP_CTX(1) },
+    range:       { kind: "num", name: "Range", slot: "tripValue", fmt: "##0_U", unit: "distance", min: 0, max: 999, step: 1, nodata: "---_U", ctx: TRIP_CTX(2) },
+    tripA:       { kind: "num", name: "Trip A", slot: "tripValue", fmt: "#G##0D0_U", unit: "distance", min: 0, max: 9999.9, step: 0.1, nodata: "n/a", ctx: TRIP_CTX(3) },
+    tripB:       { kind: "num", name: "Trip B", slot: "tripValue", fmt: "#G##0D0_U", unit: "distance", min: 0, max: 9999.9, step: 0.1, nodata: "n/a", ctx: TRIP_CTX(4) },
+    tyreFront:   { kind: "num", name: "Tyre pressure, front", slot: "vVal0", fmt: "0D0_U", unit: "pressure", min: 1.0, max: 3.5, step: 0.1, nodata: "-D-_U", ctx: { section: 3 } },
+    tyreRear:    { kind: "num", name: "Tyre pressure, rear", slot: "vVal1", fmt: "0D0_U", unit: "pressure", min: 1.0, max: 3.5, step: 0.1, nodata: "-D-_U", ctx: { section: 3 } },
+    fuelEconomy: { kind: "num", name: "Fuel economy", slot: "vVal2", fmt: "#0D0_U", unit: "fuelEconomy", min: 0, max: 99.9, step: 0.1, nodata: "--D-_U", ctx: { section: 3 } },
+    turnDist:    { kind: "num", name: "Next turn distance", slot: "dirDist", fmt: "#0D0_U", unit: "distance", min: 0, max: 99.9, step: 0.1, nodata: "--D-_U", ctx: NAV },
+    turnDist2:   { kind: "num", name: "Following turn distance", slot: "turnsDist", fmt: "#0D0_U", unit: "distance", min: 0, max: 99.9, step: 0.1, nodata: "--D-_U", ctx: NAV },
+    tripTime:    { kind: "num", name: "Trip time left", slot: "tiTimeVal", fmt: "##0_min", unit: null, min: 0, max: 999, step: 1, nodata: "---_min", ctx: NAVTRIP },
+    arrival:     { kind: "num", name: "Arrival time", slot: "tiArrVal", fmt: "#0:00", unit: null, min: 0, max: 2359, step: 1, nodata: "--:--", ctx: NAVTRIP,
+                   valid: function (v) { return v % 100 < 60; } },
+    toGo:        { kind: "num", name: "Trip distance to go", slot: "tiDistVal", fmt: "##0D0_U", unit: "distance", min: 0, max: 999.9, step: 0.1, nodata: "---D-_U", ctx: NAVTRIP },
+    queued:      { kind: "num", name: "Prompts waiting", slot: "promptQueued", fmt: "+0_waiting", unit: null, min: 1, max: 3, step: 1, nodata: "", ctx: { prompts: ["call", "lowTire", "lowFuel"] } },
+
+    pageName:    { kind: "text", name: "Page name", slot: "pageName", texts: SECTIONS.map(function (s) { return s.label; }), ctx: { section: 0 } },
+    tripLabel:   { kind: "text", name: "Trip window label", slot: "tripLabel", texts: TRIP_WINDOW.map(function (t) { return t.label; }), ctx: TRIP_CTX(0) },
+    zoom:        { kind: "text", name: "Map zoom label", slot: "zoom", texts: ZOOM_TEXT, ctx: { section: MAP } },
+    vLabel0:     { kind: "text", name: "Front tyre label", slot: "vLabel0", texts: ["Front tyre"], ctx: { section: 3 } },
+    vLabel1:     { kind: "text", name: "Rear tyre label", slot: "vLabel1", texts: ["Rear tyre"], ctx: { section: 3 } },
+    vLabel2:     { kind: "text", name: "Fuel economy label", slot: "vLabel2", texts: ["Fuel economy"], ctx: { section: 3 } },
+    dirInstruction: { kind: "text", name: "Turn instruction", slot: "dirStreet", texts: ["Turn right onto E Montgomery"], ctx: NAV },
+    turnInstruction: { kind: "text", name: "Following turn instruction", slot: "turnsText", texts: ["Then left onto Bay St"], ctx: NAV },
+    tiTimeLab:   { kind: "text", name: "Trip information label, time", slot: "tiTimeLab", texts: ["Left in trip"], ctx: NAVTRIP },
+    tiArrLab:    { kind: "text", name: "Trip information label, arrival", slot: "tiArrLab", texts: ["Arrival"], ctx: NAVTRIP },
+    tiDistLab:   { kind: "text", name: "Trip information label, distance", slot: "tiDistLab", texts: ["To go"], ctx: NAVTRIP },
+    volumeText:  { kind: "text", name: "Volume feedback", slot: "volumeText", texts: ["Volume increase", "Volume decrease", "Volume"], ctx: { volume: true } },
+    lockNotice:  { kind: "text", name: "Locked settings notice", slot: "lockText", texts: [LOCK_TEXT], ctx: { section: 4, lock: true } },
+    promptTitle: { kind: "text", name: "Prompt title", slot: "promptTitle", texts: promptTexts(function (p) { return p.title; }), ctx: { prompts: ["call"] } },
+    promptSub:   { kind: "text", name: "Prompt detail", slot: "promptSub", texts: promptTexts(function (p) { return p.sub; }), ctx: { prompts: ["call"] } },
+    promptHint1: { kind: "text", name: "Prompt hint, first", slot: "promptHint1", texts: promptTexts(function (p) { return p.hints[0]; }), ctx: { prompts: ["call"] } },
+    promptHint2: { kind: "text", name: "Prompt hint, second", slot: "promptHint2", texts: promptTexts(function (p) { return p.hints[1]; }), ctx: { prompts: ["call"] } }
+  };
+
+  function unitLabel(f) { return f.unit ? STYLE.units[f.unit] : ""; }
+  function expand(tpl, f) {
+    return tpl.replace(/[D_U]/g, function (c) { return c === "D" ? STYLE.D : c === "_" ? " " : unitLabel(f); });
+  }
+  function decimals(f) {
+    var i = f.fmt.indexOf("D"), n = 0;
+    if (i < 0) return 0;
+    for (var k = i + 1; k < f.fmt.length && "0#".indexOf(f.fmt.charAt(k)) >= 0; k++) n++;
+    return n;
+  }
+  function validNum(f, v) {
+    if (v === null || v === undefined || isNaN(v)) return false;
+    if (v < f.min - 1e-9 || v > f.max + 1e-9) return false;
+    return f.valid ? f.valid(v) : true;
+  }
+  // Fills the format from right to left with the digits of the value.
+  function fmtNum(f, v) {
+    var nodata = expand(f.nodata, f);
+    if (!validNum(f, v)) return nodata;
+    var d = decimals(f), digits = String(Math.round(v * Math.pow(10, d)));
+    while (digits.length < d + 1) digits = "0" + digits;
+    var out = "", i = digits.length;
+    for (var k = f.fmt.length - 1; k >= 0; k--) {
+      var c = f.fmt.charAt(k);
+      if (c === "0" || c === "#") { if (i > 0) out = digits.charAt(--i) + out; else if (c === "0") out = "0" + out; }
+      else if (c === "G") { if (i > 0) out = STYLE.G + out; }
+      else if (c === "D") out = STYLE.D + out;
+      else if (c === "_") out = " " + out;
+      else if (c === "U") out = unitLabel(f) + out;
+      else out = c + out;
+    }
+    return i > 0 ? nodata : out;   // more digits than the format holds counts as out of range
+  }
+  Object.keys(FIELDS).forEach(function (id) {
+    var f = FIELDS[id];
+    f.id = id;
+    if (f.kind === "num") {
+      f.maxText = fmtNum(f, f.max);
+      f.nodataText = expand(f.nodata, f);
+      f.longest = f.nodataText.length > f.maxText.length ? f.nodataText : f.maxText;
+    } else {
+      f.longest = f.texts.reduce(function (a, b) { return b.length > a.length ? b : a; }, "");
+    }
+    f.chars = f.longest.length;
+  });
+  var forced = {};   // field id -> forced text (text fields) or forced value / null for no data (numeric fields), set by hmiSet
+  function has(id) { return Object.prototype.hasOwnProperty.call(forced, id); }
+  function T(id, normal) { return has(id) ? forced[id] : normal; }
+  function N(id) { return fmtNum(FIELDS[id], has(id) ? forced[id] : SIM[id]); }
+  function put(id, s) { var n = document.getElementById(id); if (n) n.textContent = s; }
+  function putHidden(id, hide) { var n = document.getElementById(id); if (n) n.hidden = hide; }
+
+  // vehicleIsMoving and guidanceIsActive are driven from the developer panel.
+  // bluetoothIsConnected is assumed TRUE in this build.
+  // Merged onto the live version (1793660129-2282): its page, menu, trip window and map zoom logic is kept as is.
+  var state = {
+    currentSection: 0,
+    isTopLevel: true,
+    menuIsVisible: false,
+    menuFocusItem: 0,
+    vehicleIsMoving: false,
+    guidanceIsActive: false,
+    tripInfoIsVisible: false,
+    tripWindowSelection: 0,
+    mapZoomLevel: 1,
+    mediaVolume: 15,
+    currentFeedbackOverlay: null,   // { kind: "volume" | "settingsHidden", text }
+    overlayStack: [],               // prompt ids, bottom to top; the last one is active
+    pendingFeedback: [],            // feedback overlays waiting for a prompt to close or the current one to finish
+    conditions: { call: false, lowTire: false, lowFuel: false, sideStand: false }
+  };
+  var timeoutId = null, feedbackTimer = null, tripTimer = null;
+
+  var el = {
+    pageName: document.getElementById("pageName"),
+    trip: document.getElementById("trip"),
+    tripLabel: document.getElementById("tripLabel"),
+    zoom: document.getElementById("zoom"),
+    menu: document.getElementById("menu"),
+    live: document.getElementById("live"),
+    dpad: document.getElementById("dpad"),
+    directions: document.getElementById("directions"),
+    turns: document.getElementById("turns"),
+    page: document.querySelector(".page"),
+    menuBtns: document.querySelectorAll(".mbtn"),
+    menuDots: document.querySelectorAll(".mdot"),
+    tripInfo: document.getElementById("tripInfo"),
+    fbVolume: document.getElementById("fbVolume"),
+    fbPill: document.getElementById("fbPill"),
+    prompt: document.getElementById("prompt"),
+    promptTitle: document.getElementById("promptTitle"),
+    promptSub: document.getElementById("promptSub"),
+    devMoving: document.getElementById("devMoving"),
+    devGuidance: document.getElementById("devGuidance"),
+    queueList: document.getElementById("queueList")
+  };
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function polar(cx, r, deg) {
+    var a = deg * Math.PI / 180;
+    return [cx + r * Math.cos(a), cx + r * Math.sin(a)];
+  }
+
+  /* ---------- D-pad drawing ---------- */
+  function wedgePath(center) {
+    var R = 96, r = 56, half = 41;
+    var o1 = polar(100, R, center - half), o2 = polar(100, R, center + half);
+    var i2 = polar(100, r, center + half), i1 = polar(100, r, center - half);
+    return "M" + o1 + " A" + R + " " + R + " 0 0 1 " + o2 + " L" + i2 + " A" + r + " " + r + " 0 0 0 " + i1 + " Z";
+  }
+  var DPAD = [
+    { input: "UpButton", label: "Up", angle: -90 },
+    { input: "RightButton", label: "Right", angle: 0 },
+    { input: "DownButton", label: "Down", angle: 90 },
+    { input: "LeftButton", label: "Left", angle: 180 }
+  ];
+  var dpadIcons = {};
+  var segByInput = {};
+  DPAD.forEach(function (d) {
+    var g = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": d.label, "data-input": d.input });
+    g.appendChild(svg("path", { d: wedgePath(d.angle) }));
+    var p = polar(100, 76, d.angle);
+    var icon = svg("polygon", { "class": "icon", points: "0,-8 9,6 -9,6", transform: "translate(" + p[0] + " " + p[1] + ") rotate(" + (d.angle + 90) + ")" });
+    g.appendChild(icon);
+    el.dpad.appendChild(g);
+    dpadIcons[d.input] = icon;
+    segByInput[d.input] = g;
+  });
+  var cg = svg("g", { "class": "seg", role: "button", tabindex: "0", "aria-label": "Center", "data-input": "CenterButton" });
+  cg.appendChild(svg("rect", { x: 66, y: 66, width: 68, height: 68, rx: 18 }));
+  var cIcon = svg("circle", { "class": "icon center", cx: 100, cy: 100, r: 9 });
+  cg.appendChild(cIcon);
+  el.dpad.appendChild(cg);
+  dpadIcons.CenterButton = cIcon;
+  segByInput.CenterButton = cg;
+
+  /* ---------- Helpers ---------- */
+  function isMedia(input) { return input === "VolumeUpButton" || input === "VolumeDownButton"; }
+  function topPromptId() {
+    var s = state.overlayStack;
+    return s.length ? s[s.length - 1] : null;
+  }
+  function stepIndex(from, dir) {
+    // Settings stays in the menu while moving.
+    return (from + dir + SECTIONS.length) % SECTIONS.length;
+  }
+  // The "Settings are hidden" pill is a safety layer that belongs to the Settings page itself. It stays up
+  // while the vehicle is moving and the menu is closed, never over the menu. It is state-bound, not timed.
+  function lockNoticeApplies() {
+    return state.vehicleIsMoving && state.currentSection === SETTINGS && !state.menuIsVisible;
+  }
+  // currentSection and menuFocusItem change together, always.
+  function setSection(i) {
+    state.currentSection = i;
+    state.menuFocusItem = i;
+    state.isTopLevel = true;
+  }
+  function restartTimeout() {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(function () {
+      if (state.menuIsVisible) { dismissMenu(); render(); }
+    }, MENU_TIMEOUT_MS);
+  }
+  function openMenu() { state.menuIsVisible = true; restartTimeout(); }
+  function dismissMenu() { state.menuIsVisible = false; clearTimeout(timeoutId); }
+
+  // Notification priority (highest first): 1 interactive prompts, 2 media feedback, 3 main menu, 4 user/system.
+  // MediaFeedbackOverlay keeps one nullable reference (currentFeedbackOverlay). Anything that cannot show yet
+  // waits in pendingFeedback and is shown in arrival order once the higher tier clears.
+  function clearFeedback() { state.currentFeedbackOverlay = null; clearTimeout(feedbackTimer); }
+  function dropPending(kind) {
+    state.pendingFeedback = state.pendingFeedback.filter(function (f) { return f.kind !== kind; });
+  }
+  function presentFeedback(fb) {
+    state.currentFeedbackOverlay = fb;
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(function () {
+      state.currentFeedbackOverlay = null;
+      pumpFeedback();
+      render();
+    }, FEEDBACK_TIMEOUT_MS);
+  }
+  function pumpFeedback() {
+    if (state.overlayStack.length || state.currentFeedbackOverlay) return;
+    var next = state.pendingFeedback.shift();
+    if (next) presentFeedback(next);
+  }
+  function showFeedback(kind, text) {
+    var fb = { kind: kind, text: text };
+    var cur = state.currentFeedbackOverlay;
+    dropPending(kind);
+    // A prompt is open, or a different feedback is on screen: wait in line.
+    if (state.overlayStack.length || (cur && cur.kind !== kind)) { state.pendingFeedback.push(fb); return; }
+    // Same kind (for example another volume press) replaces the current one and restarts its timeout.
+    presentFeedback(fb);
+  }
+
+  // PromptOverlay stack: higher priority sits above lower priority; an equal-priority newcomer queues below.
+  function openPrompt(id) {
+    if (state.overlayStack.indexOf(id) !== -1) return;
+    var p = PROMPTS[id].priority, s = state.overlayStack, at = s.length;
+    for (var i = 0; i < s.length; i++) {
+      if (PROMPTS[s[i]].priority >= p) { at = i; break; }
+    }
+    s.splice(at, 0, id);
+    dismissMenu();
+    // A prompt outranks feedback: the feedback on screen goes back to the front of the line.
+    var cur = state.currentFeedbackOverlay;
+    if (cur) { dropPending(cur.kind); state.pendingFeedback.unshift(cur); clearFeedback(); }
+  }
+  function removePrompt(id) {
+    var i = state.overlayStack.indexOf(id);
+    if (i !== -1) state.overlayStack.splice(i, 1);
+    pumpFeedback();
+  }
+
+  function showTripInfo() {
+    state.tripInfoIsVisible = true;
+    clearTimeout(tripTimer);
+    tripTimer = setTimeout(function () { state.tripInfoIsVisible = false; render(); }, TRIPINFO_TIMEOUT_MS);
+  }
+  function hideTripInfo() { state.tripInfoIsVisible = false; clearTimeout(tripTimer); }
+  function endGuidance() {
+    state.guidanceIsActive = false;
+    hideTripInfo();
+  }
+
+  /* ---------- Step 1: Button Guard Table ---------- */
+  function suppressed(input) {
+    var top = topPromptId();
+    if (isMedia(input)) {
+      if (top === "call") return true;
+      if (input === "VolumeUpButton" && state.mediaVolume >= MAX_VOLUME) return true;
+      if (input === "VolumeDownButton" && state.mediaVolume <= 0) return true;
+      return false;
+    }
+    if (top) {
+      if (PROMPTS[top].alert) return !(input === "CenterButton" || input === "LeftButton");
+      return !(input === "CenterButton" || input === "DownButton");
+    }
+    if (state.menuIsVisible) return input === "TripButton" || input === "UpButton" || input === "DownButton";
+    if (state.currentSection === MAP) {
+      if (input === "UpButton" && state.mapZoomLevel >= MAX_ZOOM) return true;
+      if (input === "DownButton" && state.mapZoomLevel <= MIN_ZOOM) return true;
+      if ((input === "LeftButton" || input === "CenterButton") && !state.guidanceIsActive) return true;
+    }
+    return input === "TripButton" && state.currentSection !== 0;
+  }
+
+  /* ---------- Steps 2 and 3: routing (context x input) ---------- */
+  function route(input) {
+    if (input === "VolumeUpButton") return "volumeUp";
+    if (input === "VolumeDownButton") return "volumeDown";
+    var top = topPromptId();
+    if (top) {
+      if (PROMPTS[top].alert) return (input === "CenterButton" || input === "LeftButton") ? "dismissAlert" : null;
+      if (input === "CenterButton") return "acceptCall";
+      if (input === "DownButton") return "declineCall";
+      return null;
+    }
+    if (state.menuIsVisible) {
+      switch (input) {
+        case "PageButton": case "RightButton": return "menuNext";
+        case "LeftButton": return "menuPrev";
+        case "CenterButton": return "menuDismiss";
+        case "HomeButton": return "homeAndDismiss";
+      }
+      return null;
+    }
+    var onHome = state.currentSection === 0;
+    var onMap = state.currentSection === MAP;
+    switch (input) {
+      case "PageButton": return "openMenuNext";
+      case "HomeButton": return onHome ? null : "goHome";
+      case "TripButton": return onHome ? "tripNext" : null;
+      case "UpButton": return onMap ? "zoomIn" : null;
+      case "DownButton": return onHome ? "tripNext" : onMap ? "zoomOut" : null;
+      case "LeftButton": return onMap ? "cancelRoute" : null;
+      case "CenterButton": return onMap ? "toggleTripInfo" : null;
+    }
+    return null;
+  }
+
+  /* ---------- Step 4: execute ---------- */
+  function execute(action) {
+    switch (action) {
+      case "openMenuNext": setSection(stepIndex(state.currentSection, 1)); openMenu(); break;
+      case "menuNext": setSection(stepIndex(state.currentSection, 1)); restartTimeout(); break;
+      case "menuPrev": setSection(stepIndex(state.currentSection, -1)); restartTimeout(); break;
+      case "menuDismiss": dismissMenu(); break;
+      case "homeAndDismiss": setSection(0); dismissMenu(); break;
+      case "goHome": setSection(0); break;
+      case "tripNext": state.tripWindowSelection = (state.tripWindowSelection + 1) % TRIP_WINDOW.length; break;
+      case "zoomIn": state.mapZoomLevel += 1; break;
+      case "zoomOut": state.mapZoomLevel -= 1; break;
+      case "cancelRoute": endGuidance(); break;
+      case "toggleTripInfo": if (state.tripInfoIsVisible) hideTripInfo(); else showTripInfo(); break;
+      case "volumeUp": state.mediaVolume += 1; showFeedback("volume", "Volume increase"); break;
+      case "volumeDown": state.mediaVolume -= 1; showFeedback("volume", "Volume decrease"); break;
+      case "acceptCall": case "declineCall":
+        state.conditions.call = false; removePrompt("call"); break;
+      case "dismissAlert":
+        // Dismisses the alert only. The condition stays active.
+        removePrompt(topPromptId()); break;
+    }
+  }
+
+  function handle(input) {
+    if (!suppressed(input)) {
+      var action = route(input);
+      if (action) execute(action);
+    }
+    render();
+  }
+
+  /* ---------- Developer controls (system events) ---------- */
+  function toggleCondition(id) {
+    if (state.conditions[id]) {
+      state.conditions[id] = false;
+      removePrompt(id);
+    } else {
+      state.conditions[id] = true;
+      openPrompt(id);
+    }
+  }
+  function setMoving(on) {
+    // Settings stays reachable while moving, so the rider is not sent Home; the page shows the pill instead.
+    state.vehicleIsMoving = on;
+  }
+  function setGuidance(on) {
+    if (on) state.guidanceIsActive = true; else endGuidance();
+  }
+  function dev(action) {
+    switch (action) {
+      case "call": case "lowTire": case "lowFuel": case "sideStand": toggleCondition(action); break;
+      case "hangup":
+        if (state.conditions.call) { state.conditions.call = false; removePrompt("call"); }
+        break;
+      case "directions":
+        // The guidance banner stays up for as long as guidance is active, on the Navigation page only.
+        if (state.guidanceIsActive) endGuidance();
+        else { state.guidanceIsActive = true; setSection(MAP); dismissMenu(); }
+        break;
+      case "tripInfo":
+        if (state.tripInfoIsVisible) hideTripInfo();
+        else { state.guidanceIsActive = true; setSection(MAP); dismissMenu(); showTripInfo(); }
+        break;
+      case "volumeBurst": showFeedback("volume", "Volume"); break;
+      case "settingsHidden":
+        state.vehicleIsMoving = true;
+        setSection(SETTINGS);
+        dismissMenu();
+        break;
+      case "clear":
+        state.overlayStack = [];
+        state.pendingFeedback = [];
+        state.conditions = { call: false, lowTire: false, lowFuel: false, sideStand: false };
+        clearFeedback(); state.menuIsVisible = false; clearTimeout(timeoutId); endGuidance();
+        break;
+    }
+    render();
+  }
+
+  /* ---------- Menu layout ----------
+     The selected page button is centred on the circle centre of the opening (306.5, 307) and the others sit
+     240 units apart; whatever falls outside the display is cut off by the Display mask. */
+  var MENU_CENTER_X = 306.5, MENU_CENTER_Y = 307, MENU_PITCH = 240, BTN_CENTER_Y = 98;
+  function layoutMenu() {
+    var sel = state.menuFocusItem;
+    el.menuBtns.forEach(function (g, i) {
+      var cx = parseFloat(g.getAttribute("data-cx"));
+      var x = MENU_CENTER_X + MENU_PITCH * (i - sel) - cx;
+      g.style.transform = "translate(" + x + "px," + (MENU_CENTER_Y - BTN_CENTER_Y) + "px)";
+      g.classList.toggle("sel", i === sel);
+    });
+    el.menuDots.forEach(function (d, i) { d.classList.toggle("sel", i === sel); });
+  }
+
+  /* ---------- Rendering ---------- */
+  function render() {
+    var cur = SECTIONS[state.currentSection];
+    var trip = TRIP_WINDOW[state.tripWindowSelection];
+    var topId = topPromptId();
+    var fb = state.currentFeedbackOverlay;
+    var showTrip = state.currentSection === 0 && !state.menuIsVisible;
+    var showVehicle = state.currentSection === 3 && !state.menuIsVisible;
+    // Settings pill: only on the locked Settings page, and only when nothing outranks it
+    // (a prompt, or the full-screen volume overlay). While it shows, the page shows nothing else.
+    var lockApplies = lockNoticeApplies();
+    var pillShown = lockApplies && !topId && !(fb && fb.kind === "volume");
+    var onMap = state.currentSection === MAP;
+    put("pageName", T("pageName", cur.label));
+    el.pageName.hidden = pillShown;
+    put("tripLabel", T("tripLabel", trip.label));
+    put("tripValue", N(trip.field));
+    el.trip.hidden = !showTrip;
+    putHidden("vlist", !showVehicle);
+    put("vLabel0", T("vLabel0", "Front tyre")); put("vVal0", N("tyreFront"));
+    put("vLabel1", T("vLabel1", "Rear tyre")); put("vVal1", N("tyreRear"));
+    put("vLabel2", T("vLabel2", "Fuel economy")); put("vVal2", N("fuelEconomy"));
+    var showZoom = state.currentSection === MAP && !state.menuIsVisible;
+    put("zoom", T("zoom", ZOOM_TEXT[state.mapZoomLevel]));
+    el.zoom.hidden = !showZoom;
+    el.menu.hidden = !state.menuIsVisible;
+    layoutMenu();
+
+    // Guidance and trip information belong to the Navigation page only.
+    el.directions.hidden = !(state.guidanceIsActive && onMap);
+    el.turns.hidden = el.directions.hidden;
+    el.page.classList.toggle("guided", state.guidanceIsActive && onMap);
+    put("dirDist", N("turnDist")); put("dirStreet", T("dirInstruction", "Turn right onto E Montgomery"));
+    put("turnsText", T("turnInstruction", "Then left onto Bay St")); put("turnsDist", N("turnDist2"));
+    el.tripInfo.hidden = !(state.tripInfoIsVisible && state.guidanceIsActive && onMap);
+    put("tiTimeVal", N("tripTime")); put("tiArrVal", N("arrival")); put("tiDistVal", N("toGo"));
+    put("tiTimeLab", T("tiTimeLab", "Left in trip")); put("tiArrLab", T("tiArrLab", "Arrival")); put("tiDistLab", T("tiDistLab", "To go"));
+    el.fbVolume.hidden = !(fb && fb.kind === "volume");
+    el.fbPill.hidden = !pillShown;
+    put("volumeText", T("volumeText", fb && fb.kind === "volume" ? fb.text : "Volume"));
+    put("lockText", T("lockNotice", LOCK_TEXT));
+
+    el.prompt.hidden = !topId;
+    var promptText = "";
+    if (topId) {
+      var p = PROMPTS[topId], waiting = state.overlayStack.length - 1;
+      put("promptTitle", T("promptTitle", p.title));
+      put("promptSub", T("promptSub", p.sub));
+      var h1 = T("promptHint1", p.hints[0]), h2 = T("promptHint2", p.hints[1] || "");
+      put("promptHint1", h1); putHidden("promptHint1", !h1);
+      put("promptHint2", h2); putHidden("promptHint2", !h2);
+      var showQ = has("queued") || waiting > 0;
+      put("promptQueued", fmtNum(FIELDS.queued, has("queued") ? forced.queued : waiting));
+      putHidden("promptQueued", !showQ);
+      promptText = ", " + p.title;
+    }
+
+    Object.keys(dpadIcons).forEach(function (input) {
+      var active = !suppressed(input) && route(input) !== null;
+      if (active) dpadIcons[input].removeAttribute("hidden");
+      else dpadIcons[input].setAttribute("hidden", "");
+    });
+
+    // Notification queue readout: highest tier first, newest-to-show first within a tier.
+    el.queueList.textContent = "";
+    var rows = [];
+    for (var qi = state.overlayStack.length - 1; qi >= 0; qi--) {
+      rows.push({ tier: 1, name: PROMPTS[state.overlayStack[qi]].title, status: qi === state.overlayStack.length - 1 ? "Showing" : "Waiting" });
+    }
+    if (fb) rows.push({ tier: 2, name: fb.text, status: "Showing" });
+    state.pendingFeedback.forEach(function (f) { rows.push({ tier: 2, name: f.text, status: "Waiting" }); });
+    if (lockApplies) rows.push({ tier: 2, name: LOCK_TEXT, status: pillShown ? "Showing" : "Waiting" });
+    if (!rows.length) {
+      var empty = document.createElement("li");
+      empty.className = "q-empty";
+      empty.textContent = "Nothing queued";
+      el.queueList.appendChild(empty);
+    }
+    rows.forEach(function (r) {
+      var li = document.createElement("li");
+      li.className = "q-row" + (r.status === "Showing" ? " now" : "");
+      var tier = document.createElement("span"); tier.className = "q-tier"; tier.textContent = "T" + r.tier;
+      var nm = document.createElement("span"); nm.className = "q-name"; nm.textContent = r.name;
+      var st = document.createElement("span"); st.className = "q-status"; st.textContent = r.status;
+      li.appendChild(tier); li.appendChild(nm); li.appendChild(st);
+      el.queueList.appendChild(li);
+    });
+
+    // Developer panel state
+    el.devMoving.checked = state.vehicleIsMoving;
+    el.devGuidance.checked = state.guidanceIsActive;
+    document.querySelectorAll("[data-dev]").forEach(function (b) {
+      var k = b.getAttribute("data-dev"), on = null;
+      if (state.conditions.hasOwnProperty(k)) on = state.conditions[k];
+      else if (k === "directions") on = state.guidanceIsActive;
+      else if (k === "tripInfo") on = state.tripInfoIsVisible && state.guidanceIsActive;
+      if (on !== null) b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+
+    el.live.textContent = cur.label + (showTrip ? ", " + trip.label : "") + (showZoom ? ", " + el.zoom.textContent : "") +
+      (state.menuIsVisible ? ", main menu open" : "") + promptText + (fb ? ", " + fb.text : "");
+  }
+
+  /* ---------- Test hook: window.hmiSet ----------
+     hmiSet(field, value)   forces a field and brings it on screen.
+       numeric fields: a number (in the field's own unit), "max", "min", "nodata", or "longest"
+       text fields:    any string, or "longest"
+     hmiCheck(field)        reports whether the field shows without clipping, wrapping or leaving the opening
+     hmiCheckAll()          forces the longest string of every field, checks it, then resets
+     hmiReset()             clears every forced value and overlay; hmiFields() / hmiSlots() list the spec data */
+  function reveal(c) {
+    clearTimeout(timeoutId); clearTimeout(feedbackTimer); clearTimeout(tripTimer);
+    state.overlayStack = []; state.pendingFeedback = [];
+    state.conditions = { call: false, lowTire: false, lowFuel: false, sideStand: false };
+    state.currentFeedbackOverlay = null; state.menuIsVisible = false;
+    state.guidanceIsActive = !!c.guidance; state.tripInfoIsVisible = !!c.tripInfo; state.vehicleIsMoving = !!c.lock;
+    setSection(c.section || 0);
+    if (c.trip !== undefined) state.tripWindowSelection = c.trip;
+    (c.prompts || []).forEach(function (id) { state.conditions[id] = true; openPrompt(id); });
+    if (c.volume) state.currentFeedbackOverlay = { kind: "volume", text: "Volume increase" };
+  }
+  var OPENING = new Path2D("M459.57 129.042C457.292 131.861 453.862 133.5 450.237 133.5H163.699C160.075 133.5 156.644 131.861 154.366 129.042L130.752 99.8203C72.1621 149.711 35 224.016 35 307C35 338.842 40.472 369.407 50.5264 397.805C51.6375 400.943 54.6292 403 57.958 403H145.846C148.203 403 150.44 404.039 151.96 405.841L182.603 442.159C184.122 443.961 186.36 445 188.717 445H424.283C426.64 445 428.878 443.961 430.397 442.159L461.04 405.841C462.56 404.039 464.797 403 467.154 403H556.042C559.371 403 562.363 400.943 563.474 397.805C573.528 369.407 579 338.842 579 307C579 223.998 541.821 149.679 483.209 99.7881L459.57 129.042Z");
+  var hitCtx = document.createElement("canvas").getContext("2d");
+  function r1(x) { return Math.round(x * 10) / 10; }
+  function hmiCheck(id) {
+    var f = FIELDS[id];
+    if (!f) return null;
+    var scr = document.getElementById("screen").getBoundingClientRect(), k = 613 / scr.width;
+    var n = document.getElementById(f.slot), r = { field: id, slot: f.slot, expected: f.longest };
+    r.visible = !!n && !n.closest("[hidden]") && n.getClientRects().length > 0;
+    r.text = n ? n.textContent : "";
+    if (r.visible) {
+      var rg = document.createRange(); rg.selectNodeContents(n);
+      var tb = rg.getBoundingClientRect(), bb = n.getBoundingClientRect(), tops = {};
+      Array.prototype.forEach.call(rg.getClientRects(), function (q) { tops[Math.round(q.top)] = 1; });
+      r.boxW = r1(bb.width * k); r.boxH = r1(bb.height * k); r.textW = r1(tb.width * k);
+      r.left = r1((bb.left - scr.left) * k); r.top = r1((bb.top - scr.top) * k);
+      r.clipped = n.scrollWidth > n.clientWidth + 0.5 || tb.width > bb.width + 0.5;
+      r.wrapped = Object.keys(tops).length > 1 || n.scrollHeight > n.clientHeight + 1;
+      var pts = [[tb.left, tb.top], [tb.right, tb.top], [tb.left, tb.bottom], [tb.right, tb.bottom]];
+      r.outside = pts.some(function (q) { return !hitCtx.isPointInPath(OPENING, (q[0] - scr.left) * k, (q[1] - scr.top) * k); });
+    }
+    r.ok = r.visible && r.text === f.longest && !r.clipped && !r.wrapped && !r.outside;
+    return r;
+  }
+  function hmiSet(id, value, opts) {
+    var f = FIELDS[id];
+    if (!f) { console.warn("hmiSet: unknown field '" + id + "'. hmiFields() lists them."); return null; }
+    if (f.kind === "num") {
+      var v = value;
+      if (v === "max") v = f.max;
+      else if (v === "min") v = f.min;
+      else if (v === "longest") v = f.nodataText.length > f.maxText.length ? null : f.max;
+      else if (v === "nodata" || v === null || v === undefined) v = null;
+      else v = Number(v);
+      forced[id] = v;
+    } else {
+      forced[id] = (value === "longest" || value === undefined) ? f.longest : String(value);
+    }
+    if (!opts || opts.reveal !== false) reveal(f.ctx || {});
+    render();
+    return document.getElementById(f.slot).textContent;
+  }
+  function hmiReset() { forced = {}; reveal({}); render(); }
+  function hmiCheckAll() {
+    var out = [];
+    Object.keys(FIELDS).forEach(function (id) { hmiSet(id, "longest"); out.push(hmiCheck(id)); });
+    hmiReset();
+    return out;
+  }
+  function plain(f) { var o = {}; Object.keys(f).forEach(function (k) { if (typeof f[k] !== "function") o[k] = f[k]; }); return o; }
+  window.hmiSet = hmiSet; window.hmiReset = hmiReset; window.hmiCheck = hmiCheck; window.hmiCheckAll = hmiCheckAll;
+  window.hmiFields = function () { var o = {}; Object.keys(FIELDS).forEach(function (id) { o[id] = plain(FIELDS[id]); }); return o; };
+  window.hmiSlots = function () { return JSON.parse(JSON.stringify(SLOTS)); };
+  window.hmiStyle = function () { return JSON.parse(JSON.stringify(STYLE)); };
+  Object.keys(SLOTS).forEach(function (sid) {
+    var n = document.getElementById(sid), s = SLOTS[sid];
+    if (!n) return;
+    n.style.setProperty("--w", s.w); n.style.setProperty("--h", s.h); n.style.setProperty("--fs", s.fs);
+    n.style.setProperty("--ta", s.ta); n.style.setProperty("--fw", s.fw);
+  });
+
+  /* ---------- Wiring ---------- */
+  function flash(node) {
+    node.classList.add("pressed");
+    setTimeout(function () { node.classList.remove("pressed"); }, 110);
+  }
+  document.querySelectorAll("[data-input]").forEach(function (node) {
+    node.addEventListener("click", function () { handle(node.getAttribute("data-input")); });
+    if (node.tagName.toLowerCase() === "g") {
+      node.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); flash(node); handle(node.getAttribute("data-input")); }
+      });
+    }
+  });
+  document.querySelectorAll("[data-dev]").forEach(function (node) {
+    node.addEventListener("click", function () { dev(node.getAttribute("data-dev")); });
+  });
+  el.devMoving.addEventListener("change", function () { setMoving(el.devMoving.checked); render(); });
+  el.devGuidance.addEventListener("change", function () { setGuidance(el.devGuidance.checked); render(); });
+
+  var KEYMAP = {
+    ArrowUp: "UpButton", ArrowDown: "DownButton", ArrowLeft: "LeftButton", ArrowRight: "RightButton",
+    Enter: "CenterButton", p: "PageButton", t: "TripButton", h: "HomeButton",
+    "+": "VolumeUpButton", "=": "VolumeUpButton", "-": "VolumeDownButton"
+  };
+  document.addEventListener("keydown", function (e) {
+    if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+    var input = KEYMAP[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!input) return;
+    e.preventDefault();
+    var node = segByInput[input] || document.querySelector('.key[data-input="' + input + '"]');
+    if (node) flash(node);
+    handle(input);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
